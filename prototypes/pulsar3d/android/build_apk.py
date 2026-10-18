@@ -5,7 +5,6 @@ Toolchain (paths passed through environment variables):
   ANDROID_JAR  platform android.jar (API 30+), used to compile and link
   DX_JAR       dalvik-dx jar (Java bytecode -> classes.dex)
   THREE_DIR    an installed three@0.170.0 package (node_modules/three)
-  FONTS_DIR    folder with fonts.css (Google Fonts CSS) and the downloaded .woff2 files
   SIGNER_DIR   folder whose node_modules contains apk_sign_ts
   KEY_PEM / CERT_PEM  signing key and certificate (PEM)
   ICON_SRC     square-ish PNG used to generate launcher icons (optional)
@@ -36,8 +35,6 @@ def stage_web(www):
     html = open(os.path.join(GAME, "index.html"), encoding="utf-8").read()
     html = html.replace("https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "./lib/three.module.js")
     html = html.replace("https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/", "./lib/addons/")
-    html = re.sub(r'<link rel="preconnect"[^>]*>\n', "", html)
-    html = re.sub(r'<link href="https://fonts.googleapis.com[^>]*>', '<link href="fonts/fonts.css" rel="stylesheet">', html)
     assert "jsdelivr" not in html and "googleapis" not in html, "network URL left in the bundled page"
     open(os.path.join(www, "index.html"), "w", encoding="utf-8").write(html)
     shutil.copy(os.path.join(GAME, "assets", "pulsar.glb"), os.path.join(www, "assets", "pulsar.glb"))
@@ -53,16 +50,7 @@ def stage_web(www):
     shutil.copy(os.path.join(jsm, "loaders", "GLTFLoader.js"), os.path.join(lib, "addons", "loaders"))
     shutil.copy(os.path.join(jsm, "utils", "BufferGeometryUtils.js"), os.path.join(lib, "addons", "utils"))
 
-    fonts_src, fonts_dst = ENV["FONTS_DIR"], os.path.join(www, "fonts")
-    os.makedirs(fonts_dst, exist_ok=True)
-    css = open(os.path.join(fonts_src, "fonts.css"), encoding="utf-8").read()
-    def local(m):
-        name = m.group(1).replace("https://fonts.gstatic.com/s/", "").replace("/", "_")
-        shutil.copy(os.path.join(fonts_src, name), os.path.join(fonts_dst, name))
-        return "url(" + name + ")"
-    css = re.sub(r"url\((https://fonts\.gstatic\.com[^)]*)\)", local, css)
-    open(os.path.join(fonts_dst, "fonts.css"), "w", encoding="utf-8").write(css)
-
+    shutil.copytree(os.path.join(GAME, "fonts"), os.path.join(www, "fonts"))  # the game already serves its fonts locally
 
 def make_icons(res):
     src = ENV.get("ICON_SRC")
