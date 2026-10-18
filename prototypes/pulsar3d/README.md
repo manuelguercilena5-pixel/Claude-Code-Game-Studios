@@ -40,6 +40,37 @@ internet access.
 Modes: **PLAY** (arcade) and **DAILY PULSE** (`Y`), where everyone gets the same
 seeded run each day.
 
+**Phase dash:** `SHIFT`, `SPACE` or right-click on desktop; the DASH button or a
+second finger on mobile.
+
+## Phase 1: depth (from player and market research)
+
+Three research agents covered what players want, how games spread and earn, and
+depth systems. Their findings agreed: runs had no decisions and no set-pieces.
+Phase 1 adds:
+
+- **Phase Dash.** 7 units in 0.15 s, invulnerable, 2.5 s cooldown. Flying
+  *through* an enemy pays PHASE points (3 × the NEAR value). Four or more in one
+  dash triggers OVERCHARGE, which refunds half the cooldown.
+- **Five sectors** (Neon Gate → Magenta Drift → Amber Rail → Toxic Bloom → White
+  Core). Each has its own floor tint, enemy mix and spawn curve. After the fifth
+  the cycle repeats 15% faster.
+- **The Warden.** It closes every sector. It has 3 phases set by HP and fires
+  rings of orbs with a rotating 3-orb gap, plus twin spirals. Each attack is
+  telegraphed by 0.6 s of glow. In phase 3 it summons drifters. Orbs can be
+  grazed. Killing it turns every orb into points.
+- **Upgrade cards.** Pick 1 of 3 after every 6 multiplier gains and after every
+  boss. 12 cards plus 2 synergies (Photon Lance, Singularity). In the daily run
+  the cards are seeded, so everyone sees the same offers.
+- **Game over that teaches.** Shows what killed you, the sector you reached and
+  your build. `R` retries in 0.45 s. COPY RESULT copies a shareable score card.
+- **Spelunky-style daily.** Only the first attempt of the day is official; later
+  ones are marked PRACTICE. Plus a daily streak counter.
+
+Next, from the same research: achievements that unlock cosmetic ships and trails
+(options, not power), a Pacifism mode, a ghost of your best run, and a second boss
+(Hydra).
+
 ## How it's built
 
 | Part | Tech |
@@ -97,3 +128,5 @@ Market-driven decisions:
 | ![](evidence/desktop-action.jpg) | ![](evidence/desktop-gameover.jpg) |
 | ![](evidence/mobile-title.jpg) | ![](evidence/mobile-play.jpg) |
 | ![](evidence/blender-models.jpg) | Blender renders (Cycles) of the models |
+| ![](evidence/phase1-draft.jpg) | ![](evidence/phase1-boss2.jpg) |
+| ![](evidence/phase1-over.jpg) | ![](evidence/phase1-mobile-cards.jpg) |
