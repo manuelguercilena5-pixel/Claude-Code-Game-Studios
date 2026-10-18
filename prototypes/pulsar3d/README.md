@@ -37,7 +37,7 @@ internet access.
 | Desktop | WASD or arrows move · the mouse aims · fire is automatic · `P` pause · `M` music · `N` sfx · `F` effects full/calm · `T` menu |
 | Mobile | drag anywhere to move (floating stick) · aim and fire are automatic |
 
-Modes: **PLAY** (arcade) and **DAILY PULSE**, where everyone gets the same
+Modes: **PLAY** (arcade) and **DAILY PULSE** (`Y`), where everyone gets the same
 seeded run each day.
 
 ## How it's built

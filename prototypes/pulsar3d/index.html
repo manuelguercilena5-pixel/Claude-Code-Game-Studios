@@ -145,7 +145,7 @@
   <div class="tag">NEON ARENA SHOOTER</div>
   <div id="modes">
     <button class="mode" id="play"><b>PLAY</b><small>click · tap · space</small></button>
-    <button class="mode" id="daily"><b>DAILY PULSE</b><small id="dailySub">same run for everyone · D</small></button>
+    <button class="mode" id="daily"><b>DAILY PULSE</b><small id="dailySub">same run for everyone · Y</small></button>
   </div>
   <div id="bestLine"></div>
 </div>
@@ -215,6 +215,8 @@ const ENEMY = {
 const POWER = { spread: { label: 'SPREAD', color: '#4DFFC3' }, overdrive: { label: 'OVERDRIVE', color: '#FFF35C' }, shield: { label: 'SHIELD', color: '#00F0FF' } };
 const HEX = { player: '#00F0FF', spark: '#FFF35C', danger: '#FF3B30', pink: '#FF2E88', mint: '#4DFFC3', white: '#FFFFFF' };
 const col = h => new THREE.Color(h);
+const SHARED = {};
+const hdrC = (h, k) => SHARED[h + k] || (SHARED[h + k] = new THREE.Color(h).multiplyScalar(k)); // cached, read-only
 const hdr = (h, k) => new THREE.Color(h).multiplyScalar(k);
 
 // ---------- storage / settings ----------
@@ -226,7 +228,7 @@ const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: 
 const settings = Object.assign({ music: true, sfx: true, fx: reduceMotion ? 'calm' : 'full' }, store.get('pulsar3d_settings', {}));
 let best = Object.assign({ score: 0, mult: 1, chain: 0, time: 0 }, store.get('pulsar3d_best', {}));
 let dailyBest = store.get('pulsar3d_daily', { day: '', score: 0 });
-const todayKey = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+const todayKey = () => { const d = new Date(); return d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1) + '-' + d.getUTCDate(); }; // UTC: one daily run worldwide
 
 // ---------- RNG ----------
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -271,6 +273,7 @@ const Sound = {
     const len = c.sampleRate * 2, ir = c.createBuffer(2, len, c.sampleRate);
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
     this.reverb = c.createConvolver(); this.reverb.buffer = ir; const rvOut = c.createGain(); rvOut.gain.value = 0.18; this.reverb.connect(rvOut); rvOut.connect(comp);
+    this.reverbMusic = c.createConvolver(); this.reverbMusic.buffer = ir; const rvm = c.createGain(); rvm.gain.value = 0.18; this.reverbMusic.connect(rvm); rvm.connect(this.duck);
     this.noise = c.createBuffer(1, c.sampleRate, c.sampleRate); const nd = this.noise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     const sb = c.createBufferSource(); sb.buffer = c.createBuffer(1, 1, 22050); sb.connect(c.destination); sb.start(0);
     this.ready = true; this.nextTime = c.currentTime + 0.08; this.startTime = this.nextTime; this.step = 0;
@@ -296,7 +299,7 @@ const Sound = {
     head.connect(g); this.env(g, t, o.a || 0.002, o.d, o.peak); g.connect(o.dest || this.sfx);
     const music = o.dest === this.pump;
     if (o.delay) { const s = c.createGain(); s.gain.value = o.delay; g.connect(s); s.connect(music ? this.delayMusic : this.delay); nodes.push(s); }
-    if (o.rev) { const s = c.createGain(); s.gain.value = o.rev; g.connect(s); s.connect(this.reverb); nodes.push(s); }
+    if (o.rev) { const s = c.createGain(); s.gain.value = o.rev; g.connect(s); s.connect(music ? this.reverbMusic : this.reverb); nodes.push(s); }
     osc.start(t); osc.stop(t + (o.a || 0.002) + o.d + 0.05); this.track(osc, nodes);
   },
   noiseHit(o) {
@@ -306,7 +309,7 @@ const Sound = {
     const g = c.createGain(), nodes = [fl, g]; src.connect(fl); let head = fl;
     if (o.shape) { fl.connect(o.shape); head = o.shape; nodes.push(o.shape); }
     head.connect(g); this.env(g, t, o.a || 0.001, o.d, o.peak); g.connect(o.dest || this.sfx);
-    if (o.rev) { const s = c.createGain(); s.gain.value = o.rev; g.connect(s); s.connect(this.reverb); nodes.push(s); }
+    if (o.rev) { const s = c.createGain(); s.gain.value = o.rev; g.connect(s); s.connect(o.dest === this.pump ? this.reverbMusic : this.reverb); nodes.push(s); }
     src.start(t, Math.random() * 0.5); src.stop(t + (o.a || 0.001) + o.d + 0.05); this.track(src, nodes);
   },
   softClip(k) { const n = 256, curve = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; curve[i] = (1 + k) * x / (1 + k * Math.abs(x)); }
@@ -324,7 +327,7 @@ const Sound = {
     this.tone({ type: 'sine', f0: f * 0.5, f1: f, d: 0.16, a: 0.03, peak: 0.035, delay: 0.2 }); },
   spark(n) { if (!this.ok()) return; const f = 1400 * Math.pow(2, (n % CONFIG.sparksPerMult) / 12); this.tone({ type: 'sine', f0: f, f1: f * 1.5, d: 0.06, peak: 0.05 }); },
   pickup() { if (!this.ok(true)) return; const t = this.now; [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone({ type: 'square', f0: f, d: 0.08, peak: 0.1, t: t + i * 0.05, delay: 0.25, filter: { type: 'lowpass', f: 4000 } })); },
-  hurt() { if (!this.ready || !settings.sfx) return; const c = this.ctx, t = c.currentTime;
+  hurt() { if (!this.ready || !settings.sfx || this.ctx.state !== 'running') return; const c = this.ctx, t = c.currentTime;
     const osc = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain(), gate = c.createGain();
     osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, t); osc.frequency.exponentialRampToValueAtTime(80, t + 0.25);
     fl.type = 'lowpass'; fl.frequency.value = 1200; lfo.type = 'square'; lfo.frequency.value = 30; lg.gain.value = 0.5; gate.gain.value = 0.5;
@@ -340,8 +343,8 @@ const Sound = {
   alarm() { if (!this.ok(true)) return; const t = this.now; for (let i = 0; i < 3; i++) this.tone({ type: 'sawtooth', f0: 220, f1: 440, d: 0.16, a: 0.01, peak: 0.07, t: t + i * 0.2, filter: { type: 'lowpass', f: 1800 } }); },
   dashCharge() { if (!this.ok()) return; this.tone({ type: 'sawtooth', f0: 120, f1: 520, d: 0.55, a: 0.05, peak: 0.04, filter: { type: 'lowpass', f: 1500 } }); },
   shieldBreak() { if (!this.ok(true)) return; this.tone({ type: 'triangle', f0: 1800, f1: 200, d: 0.35, peak: 0.18, rev: 0.4 }); this.noiseHit({ ft: 'highpass', f0: 3000, d: 0.2, peak: 0.15 }); },
-  gameOver() { if (!this.ready || !settings.sfx) return; this.tone({ type: 'sawtooth', f0: 220, f1: 55, d: 2.0, sweep: 1.5, peak: 0.25, filter: { type: 'lowpass', f: 2000, f1: 150, sweep: 1.5 }, rev: 0.7 }); },
-  click() { if (!this.ready || !settings.sfx) return; this.tone({ type: 'sine', f0: 1200, d: 0.03, a: 0.001, peak: 0.1 }); },
+  gameOver() { if (!this.ready || !settings.sfx || this.ctx.state !== 'running') return; this.tone({ type: 'sawtooth', f0: 220, f1: 55, d: 2.0, sweep: 1.5, peak: 0.25, filter: { type: 'lowpass', f: 2000, f1: 150, sweep: 1.5 }, rev: 0.7 }); },
+  click() { if (!this.ready || !settings.sfx || this.ctx.state !== 'running') return; this.tone({ type: 'sine', f0: 1200, d: 0.03, a: 0.001, peak: 0.1 }); },
   schedule() {
     if (!this.ready || this.ctx.state !== 'running') return;
     const stepDur = 60 / this.BPM / 4;
@@ -537,7 +540,7 @@ const floorMat = new THREE.ShaderMaterial({
       lineC += (minor + major) * min(wave, 1.2) * 0.8 * mix(vec3(0.1, 1.2, 1.6), vec3(1.6, 0.2, 0.9), clamp(vH * 0.6 + 0.5, 0.0, 1.0));
       vec3 c = base + lineC;
       vec2 dp = vW.xz - uPlayer.xz; float pd = dot(dp, dp);
-      c += vec3(0.0, 0.85, 1.0) * (exp(-pd * 0.07) * 0.22 + (minor + major) * exp(-pd * 0.03) * 0.6);
+      c += vec3(0.0, 0.85, 1.0) * (exp(-pd * 0.09) * 0.07 + (minor + major) * exp(-pd * 0.05) * 0.18);
       for (int i = 0; i < ${MAX_FL}; i++) { vec4 f = uFl[i]; if (f.w <= 0.001) continue; vec2 d = vW.xz - f.xy;
         float k = exp(-dot(d, d) / (f.z * f.z)); c += uFlC[i] * f.w * k * (0.35 + (minor + major) * 1.4); }
       float edge = smoothstep(uR - 2.2, uR, r);
@@ -590,9 +593,9 @@ const ringGeo = new THREE.RingGeometry(0.9, 1, 64); ringGeo.rotateX(-Math.PI / 2
 // =====================================================================
 const TEMPL = {};
 const UP = new THREE.Vector3(0, 1, 0);
-function materialsFor(hex, bodyTint = 0.07) {
+function materialsFor(hex, bodyTint = 0.07, glowK = 2.6) {
   const body = new THREE.MeshStandardMaterial({ color: new THREE.Color('#0d0b18').lerp(new THREE.Color(hex), bodyTint), metalness: 0.92, roughness: 0.26, envMapIntensity: 1.4 });
-  const glow = new THREE.MeshBasicMaterial({ color: hdr(hex, 2.6) });
+  const glow = new THREE.MeshBasicMaterial({ color: hdr(hex, glowK) });
   const glass = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex).multiplyScalar(0.3), emissive: new THREE.Color(hex), emissiveIntensity: 0.6, metalness: 0.3, roughness: 0.05 });
   return { body, glow, glass };
 }
@@ -601,8 +604,8 @@ function sanitize(geo) { // a single NaN normal poisons the HDR bloom chain and 
   for (let i = 0; i < n.array.length; i++) if (!Number.isFinite(n.array[i])) { geo.computeVertexNormals(); break; }
   const fixed = geo.attributes.normal.array; for (let i = 0; i < fixed.length; i++) if (!Number.isFinite(fixed[i])) fixed[i] = 0;
 }
-function prepTemplate(src, hex) {
-  const root = src.clone(true), mats = materialsFor(hex);
+function prepTemplate(src, hex, bodyTint, glowK) {
+  const root = src.clone(true), mats = materialsFor(hex, bodyTint, glowK);
   root.traverse(o => { if (!o.isMesh) return; sanitize(o.geometry); const n = (o.material && o.material.name) || '';
     o.material = n.startsWith('Glow') ? mats.glow : n.startsWith('Glass') ? mats.glass : mats.body; });
   return root;
@@ -618,7 +621,7 @@ function fallbackModels() {
   return m;
 }
 function buildTemplates(models) {
-  TEMPL.player = prepTemplate(models.Player, HEX.player);
+  TEMPL.player = prepTemplate(models.Player, HEX.player, 0.32, 3.6);
   for (const t of Object.keys(ENEMY)) TEMPL[t] = prepTemplate(models[ENEMY[t].model], ENEMY[t].color);
 }
 
@@ -750,6 +753,15 @@ function updateTrail(x, z, y, ang, show) {
   trailGeo.attributes.position.needsUpdate = true; trailGeo.attributes.color.needsUpdate = true;
 }
 
+// heading chevron on the floor (always shows where the ship points) and mouse reticle
+const headingObj = new THREE.Group(); scene.add(headingObj);
+{ const sh = new THREE.Shape(); sh.moveTo(0, 0.55); sh.lineTo(-0.55, -0.15); sh.lineTo(-0.32, -0.15); sh.lineTo(0, 0.22); sh.lineTo(0.32, -0.15); sh.lineTo(0.55, -0.15); sh.closePath(); // tip → local -Z (forward)
+  const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2);
+  const m = new THREE.MeshBasicMaterial({ color: hdr(HEX.player, 1.6), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  [2.3, 3.0].forEach((z, i) => { const c = new THREE.Mesh(g, i ? m.clone() : m); c.position.set(0, 0.06, -z); if (i) c.material.color = hdr(HEX.player, 0.8); headingObj.add(c); }); }
+const reticle = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: hdr(HEX.player, 1.4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+scene.add(reticle);
+
 // power-up objects
 const powerObjs = {};
 function makePowerObj(type) {
@@ -818,8 +830,8 @@ function spawnPos(minD) { // fixed number of draws keeps seeded (daily) runs in 
   return pick || c[0];
 }
 function spawnEnemy(type, x, z, warp = CONFIG.spawnWarp) {
+  if (x == null) [x, z] = spawnPos(CONFIG.spawnSafeDist); // draw before the cap check so seeded runs never drift
   if (enemies.length >= CONFIG.maxEnemies) return null;
-  if (x == null) [x, z] = spawnPos(CONFIG.spawnSafeDist);
   const d = ENEMY[type], obj = getEnemyObject(type);
   const e = { id: G.uid++, type, x, z, vx: 0, vz: 0, r: d.r, hp: d.hp, warp, warpMax: warp || 1, ang: rand(0, TAU), wander: rand(0, TAU),
     state: 'rest', timer: d.restTime ? rand(0.4, 1.4) : 0, dashLeft: 0, dir: 0, grazed: false, flash: 0, dead: false, obj, bob: rand(0, TAU) };
@@ -867,7 +879,7 @@ function killEnemy(e, scored) {
   const ns = e.type === 'splitter' ? 3 : 1;
   for (let i = 0; i < ns && sparks.length < MAXS; i++) { const a = rand(0, TAU), s = rand(1.5, 4.5); sparks.push({ x: e.x, z: e.z, vx: Math.cos(a) * s, vz: Math.sin(a) * s, life: CONFIG.sparkLife, ang: rand(0, TAU), y: 2.2, vy: 4 }); }
   if (e.type === 'splitter') for (let i = 0; i < 3; i++) { const a = e.ang + i * TAU / 3;
-    const m = spawnEnemy('mini', e.x + Math.cos(a) * 0.6, e.z + Math.sin(a) * 0.6, 0); if (m) { m.vx = Math.cos(a) * 13; m.vz = Math.sin(a) * 13; } }
+    const m = spawnEnemy('mini', e.x + Math.cos(a) * 0.6, e.z + Math.sin(a) * 0.6, 0); if (m) { m.vx = Math.cos(a) * 13; m.vz = Math.sin(a) * 13; m.immune = 0.12; } }
   if (!powerups.length && G.t - G.lastPower > CONFIG.powerMinGap && dropRng() < CONFIG.powerChance) {
     const types = Object.keys(POWER), type = types[Math.floor(dropRng() * types.length)];
     const rr = Math.min(Math.hypot(e.x, e.z), CONFIG.arenaR - 3), aa = Math.atan2(e.z, e.x);
@@ -913,6 +925,7 @@ function hitPlayer() {
 }
 function endGame() {
   G.state = 'over'; G.overT = 0; playerShadow.visible = false;
+  bullets = []; sparks = []; for (const p of powerups) p.obj.visible = false; powerups = [];
   const run = G.runId;
   enemies.forEach((e, i) => setTimeout(() => { if (G.state === 'over' && G.runId === run) killEnemy(e, false); }, 40 + i * 18));
   if (G.mode === 'daily') { const today = todayKey(), prev = dailyBest.day === today ? dailyBest.score : 0;
@@ -949,7 +962,7 @@ canvas.addEventListener('pointerdown', e => {
 }, { passive: false });
 window.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { input.sx = e.clientX; input.sy = e.clientY;
-    if (!input.mouseMoved && G.state === 'playing') G.autoAim = false; input.mouseMoved = true; if (input.touchMode) { input.touchMode = false; refreshHints(); } return; }
+    if (!input.mouseMoved && G.state === 'playing') { G.autoAim = false; refreshHints(); } input.mouseMoved = true; if (input.touchMode) { input.touchMode = false; refreshHints(); } return; }
   const s = input.stick; if (s.active && e.pointerId === s.id) { s.x = e.clientX; s.y = e.clientY;
     const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), R = 70; if (d > R) { s.ox = s.x - dx / d * R; s.oy = s.y - dy / d * R; } }
 });
@@ -957,10 +970,12 @@ const endStick = e => { if (input.stick.active && e.pointerId === input.stick.id
 window.addEventListener('pointerup', endStick); window.addEventListener('pointercancel', endStick);
 window.addEventListener('keydown', e => {
   const k = e.code; Sound.init();
+  const onButton = document.activeElement && document.activeElement.tagName === 'BUTTON';
+  if ((k === 'Space' || k === 'Enter') && onButton) return; // let the focused button click itself
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(k)) e.preventDefault();
   if (e.repeat) return; input.keys[k] = true;
-  if (k === 'Space' || k === 'Enter') { if (document.activeElement && document.activeElement.tagName === 'BUTTON') return; primary(); }
-  else if (k === 'KeyD' && G.state === 'title') startGame('daily');
+  if (k === 'Space' || k === 'Enter') primary();
+  else if (k === 'KeyY' && G.state === 'title') startGame('daily');
   else if (k === 'KeyT' || (k === 'Escape' && G.state === 'over')) goTitle();
   else if (k === 'Escape' || k === 'KeyP') togglePause();
   else if (k === 'KeyM') toggleSetting('music');
@@ -1002,7 +1017,7 @@ const shipSvg = '<svg viewBox="0 0 24 24"><path d="M12 2 L20 21 L12 16 L4 21 Z" 
 function renderLives() { hudEls.lives.innerHTML = shipSvg.repeat(Math.max(0, G.lives)); }
 function refreshHints() {
   $('controls').innerHTML = input.touchMode ? 'drag anywhere to move · auto-aim &amp; auto-fire'
-    : '<span class="kbd">WASD</span> move · <span class="kbd">MOUSE</span> aim · auto-fire · <span class="kbd">P</span> pause · <span class="kbd">M</span> music · <span class="kbd">N</span> sfx · <span class="kbd">F</span> effects';
+    : '<span class="kbd">WASD</span> move · <span class="kbd">MOUSE</span> aim · auto-fire · <span class="kbd">Y</span> daily · <span class="kbd">P</span> pause · <span class="kbd">M</span> music · <span class="kbd">N</span> sfx · <span class="kbd">F</span> effects';
   hudEls.hint.querySelector('.a').textContent = input.touchMode ? 'DRAG ANYWHERE TO MOVE · AUTO-FIRE' : (G.autoAim ? 'WASD / ARROWS TO MOVE · AUTO-AIM' : 'WASD TO MOVE · MOUSE TO AIM · AUTO-FIRE');
   $('pauseHint').textContent = input.touchMode ? 'tap to continue' : 'click · space · P to continue';
   $('retry').textContent = input.touchMode ? 'TAP TO RETRY' : 'CLICK · SPACE TO RETRY';
@@ -1012,7 +1027,7 @@ function showScreen(s) {
   $('hud').classList.toggle('hidden', !(s === 'play' || s === 'pause')); $('pause').classList.toggle('hidden', s !== 'pause');
   $('bPause').classList.toggle('hidden', !(s === 'play' || s === 'pause'));
   const ov = $('over'); if (s === 'over') { ov.classList.remove('hidden'); requestAnimationFrame(() => ov.classList.add('show')); fillGameOver(); } else { ov.classList.add('hidden'); ov.classList.remove('show'); }
-  if (s === 'title') { const db = dailyBest.day === todayKey() && dailyBest.score ? 'today ' + fmt(dailyBest.score) : 'same run for everyone · D';
+  if (s === 'title') { const db = dailyBest.day === todayKey() && dailyBest.score ? 'today ' + fmt(dailyBest.score) : 'same run for everyone · Y';
     $('dailySub').textContent = db; $('bestLine').textContent = best.score > 0 ? 'BEST ' + fmt(best.score) + '  ·  PEAK ×' + (best.mult || 1) : ''; }
   if (s === 'play') { renderLives(); refreshHints(); }
   refreshHints();
@@ -1089,22 +1104,22 @@ function updatePlayer(dt) {
   if (target) turn(Math.atan2(tz - player.z, tx - player.x), 22); else if (ml > 0.1) turn(Math.atan2(mz, mx), 10);
   // bank into lateral motion
   const fx = Math.cos(player.ang), fz = Math.sin(player.ang), lat = (player.vx * -fz + player.vz * fx) / CONFIG.playerSpeed;
-  player.bank = lerp(player.bank, -lat * 0.7, Math.min(1, dt * 8));
+  player.bank = lerp(player.bank, -lat * 1.0, Math.min(1, dt * 8));
   // fire
   const over = G.powerT.overdrive > 0, rate = CONFIG.fireRate * (over ? 2 : 1);
   player.fireCd -= dt;
   if (target && player.fireCd <= 0) {
     player.fireCd += 1 / rate; if (player.fireCd < 0) player.fireCd = 0;
-    const angs = G.powerT.spread > 0 ? [-0.26, -0.13, 0, 0.13, 0.26] : [0], c = over ? HEX.spark : G.powerT.spread > 0 ? HEX.mint : '#7ff8ff';
+    const angs = G.powerT.spread > 0 ? [-0.26, -0.13, 0, 0.13, 0.26] : [0], c = over ? HEX.spark : G.powerT.spread > 0 ? HEX.mint : '#7ff8ff', bc = hdrC(c, 3.2);
     for (const off of angs) { if (bullets.length >= MAXB) break; const an = player.ang + off + rand(-0.025, 0.025);
-      bullets.push({ x: player.x + Math.cos(an) * 1.0, z: player.z + Math.sin(an) * 1.0, vx: Math.cos(an) * CONFIG.bulletSpeed, vz: Math.sin(an) * CONFIG.bulletSpeed, life: CONFIG.bulletLife, pierce: over, hitId: -1, c: hdr(c, 3.2) }); }
+      bullets.push({ x: player.x + Math.cos(an) * 1.0, z: player.z + Math.sin(an) * 1.0, vx: Math.cos(an) * CONFIG.bulletSpeed, vz: Math.sin(an) * CONFIG.bulletSpeed, life: CONFIG.bulletLife, pierce: over, hits: over ? new Set() : null, hitId: -1, c: bc }); }
     Sound.shot();
-    emit(player.x + fx * 1.1, CONFIG.hover, player.z + fz * 1.1, fx * 8 + rand(-2, 2), rand(0, 1.5), fz * 8 + rand(-2, 2), 0.08, hdr('#ffffff', 2), 0.7);
+    emit(player.x + fx * 1.1, CONFIG.hover, player.z + fz * 1.1, fx * 8 + rand(-2, 2), rand(0, 1.5), fz * 8 + rand(-2, 2), 0.08, hdrC('#ffffff', 2), 0.7);
   }
   // engine exhaust + wake
   const sp = Math.hypot(player.vx, player.vz);
   for (const side of [-0.28, 0.28]) { const ex = player.x - fx * 0.75 - fz * side, ez = player.z - fz * 0.75 + fx * side;
-    emit(ex, CONFIG.hover, ez, -fx * rand(3, 7) + rand(-1, 1), rand(-0.5, 0.5), -fz * rand(3, 7) + rand(-1, 1), rand(0.12, 0.28), Math.random() < 0.25 ? hdr(HEX.pink, 2) : hdr(HEX.player, 2), 0.35); }
+    emit(ex, CONFIG.hover, ez, -fx * rand(3, 7) + rand(-1, 1), rand(-0.5, 0.5), -fz * rand(3, 7) + rand(-1, 1), rand(0.12, 0.28), Math.random() < 0.25 ? hdrC(HEX.pink, 2) : hdrC(HEX.player, 2), 0.35); }
   if (sp > 3 && Math.random() < 0.25) ripple(player.x, player.z, 0.12 * sp / CONFIG.playerSpeed);
   if (player.invuln > 0) player.invuln -= dt;
   for (const p in G.powerT) if (G.powerT[p] > 0) G.powerT[p] = Math.max(0, G.powerT[p] - dt);
@@ -1114,7 +1129,7 @@ function updateEnemies(dt) {
   const ss = 1 + Math.min(CONFIG.speedRampMax, G.t / CONFIG.speedRampTime), px = player.x, pz = player.z;
   for (const e of enemies) {
     if (e.dead) continue; const d = ENEMY[e.type];
-    if (e.flash > 0) e.flash -= dt;
+    if (e.flash > 0) e.flash -= dt; if (e.immune > 0) e.immune -= dt;
     if (e.warp > 0) { e.warp -= dt; e.ang += dt * 8; if (e.warp <= 0) { e.obj.beam.visible = false; shock(e.x, e.z, 0.08, d.r * 2.5, 0.2, d.color); } continue; }
     const dx = px - e.x, dz = pz - e.z, dist = Math.hypot(dx, dz) || 1, ux = dx / dist, uz = dz / dist;
     if (player.dead) { e.vx *= 0.95; e.vz *= 0.95; }
@@ -1132,7 +1147,7 @@ function updateEnemies(dt) {
       else if (e.state === 'aim') { e.vx *= 0.85; e.vz *= 0.85; if (e.timer > 0.25) e.dir = Math.atan2(uz, ux); e.ang = e.dir;
         e.timer -= dt; if (e.timer <= 0) { e.state = 'dash'; e.dashLeft = d.dashDist; ripple(e.x, e.z, 0.6); } }
       else { const v = d.dashSpeed * ss; e.vx = Math.cos(e.dir) * v; e.vz = Math.sin(e.dir) * v; e.dashLeft -= v * dt;
-        emit(e.x, CONFIG.hover, e.z, -e.vx * 0.15 + rand(-2, 2), rand(0, 1), -e.vz * 0.15 + rand(-2, 2), 0.3, hdr(d.color, 2.2), 0.5);
+        emit(e.x, CONFIG.hover, e.z, -e.vx * 0.15 + rand(-2, 2), rand(0, 1), -e.vz * 0.15 + rand(-2, 2), 0.3, hdrC(d.color, 2.2), 0.5);
         if (e.dashLeft <= 0) { e.state = 'rest'; e.timer = d.restTime; } }
     }
     e.x += e.vx * dt; e.z += e.vz * dt;
@@ -1159,10 +1174,10 @@ function updateBullets(dt) {
     b.x += b.vx * dt; b.z += b.vz * dt; b.life -= dt;
     if (b.x * b.x + b.z * b.z > R2) { b.life = 0; burst(b.x, b.z, CONFIG.hover, b.c, 4, 2, 6, 0.1, 0.25, 0.35); floorFlash(b.x, b.z, '#00F0FF', 0.8, 1.6, 0.15); continue; }
     for (const e of enemies) {
-      if (e.dead || e.warp > 0 || e.id === b.hitId) continue;
+      if (e.dead || e.warp > 0 || e.immune > 0 || e.id === b.hitId || (b.hits && b.hits.has(e.id))) continue;
       const dx = e.x - b.x, dz = e.z - b.z, rr = e.r + 0.3;
       if (dx * dx + dz * dz < rr * rr) {
-        e.hp--; e.flash = 0.06; b.hitId = e.id; e.vx += b.vx * 0.04; e.vz += b.vz * 0.04;
+        e.hp--; e.flash = 0.06; b.hitId = e.id; if (b.hits) b.hits.add(e.id); e.vx += b.vx * 0.04; e.vz += b.vz * 0.04;
         if (e.hp <= 0) killEnemy(e, true); else { Sound.hit(); burst(b.x, b.z, CONFIG.hover, hdr(ENEMY[e.type].color, 2.4), 8, 3, 10, 0.12, 0.25, 0.4); }
         if (!b.pierce) { b.life = 0; break; }
       }
@@ -1188,7 +1203,7 @@ function updatePickups(dt) {
 function step(dt) {
   if (G.state === 'paused' || G.state === 'loading') return;
   if (G.state === 'title' || G.state === 'over') {
-    if (G.state === 'over') G.overT += dt;
+    if (G.state === 'over') { G.overT += dt; enemies = enemies.filter(e => { if (e.dead) { releaseEnemyObject(e.type, e.obj); return false; } return true; }); }
     if (G.state === 'title' && Math.random() < dt * 0.7) { const a = rand(0, TAU), r = rand(0, CONFIG.arenaR * 0.8); ripple(Math.cos(a) * r, Math.sin(a) * r, rand(0.5, 1.1)); }
     updateParticles(dt); updateDebris(dt); updateRings(dt); return;
   }
@@ -1219,9 +1234,11 @@ function syncScene(dt) {
   const py = CONFIG.hover + Math.sin(time * 3) * 0.08;
   playerObj.position.set(player.x, py, player.z); playerObj.rotation.y = -player.ang - Math.PI / 2; playerBank.rotation.z = player.bank;
   playerShadow.position.set(player.x, 0.03, player.z); playerShadow.visible = pv && !player.dead;
-  playerLight.position.set(player.x, 2.0, player.z); playerLight.intensity = pv && !player.dead ? 40 : 0;
+  playerLight.position.set(player.x, 2.0, player.z); playerLight.intensity = pv && !player.dead ? 22 : 0;
   shieldMesh.visible = G.powerT.shield > 0 && playing && !(G.powerT.shield < 3 && Math.floor(G.powerT.shield * 8) % 2);
   shieldMesh.rotation.set(time * 0.7, time * 1.1, 0);
+  headingObj.visible = pv && !player.dead; headingObj.position.set(player.x, 0, player.z); headingObj.rotation.y = playerObj.rotation.y;
+  reticle.visible = playing && !G.autoAim && !player.dead; reticle.position.set(input.mx, 0.07, input.mz); reticle.rotation.y = time;
   updateTrail(player.x, player.z, py, player.ang, pv && !player.dead);
 
   // enemies
@@ -1268,7 +1285,7 @@ function syncScene(dt) {
   camPos.lerp(wantPos, lk); camLook.lerp(wantLook, lk);
   camera.position.copy(camPos); camera.position.x += tr * rand(-0.9, 0.9); camera.position.y += tr * rand(-0.6, 0.6); camera.position.z += tr * rand(-0.6, 0.6);
   camera.lookAt(camLook); camera.rotation.z += -player.vx / CONFIG.playerSpeed * 0.02 * (playing ? 1 : 0) + tr * rand(-0.03, 0.03);
-  const fov = baseFov + G.fovKick * 6 * fxMul; if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  const fov = baseFov + G.fovKick * 6 * fxMul; if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); updatePointScale(); }
 
   // post
   fxPass.uniforms.uTime.value = time; fxPass.uniforms.uAberr.value = settings.fx === 'full' ? G.aberr : 0; fxPass.uniforms.uFlash.value = G.flash * (settings.fx === 'full' ? 1 : 0.55);
@@ -1296,9 +1313,9 @@ function resize() {
   renderer.setPixelRatio(perf.pr); renderer.setSize(w, h, false); composer.setPixelRatio(perf.pr); composer.setSize(w, h);
   bloomPass.resolution.set(w * perf.pr * 0.5, h * perf.pr * 0.5);
   camera.aspect = aspect; camera.updateProjectionMatrix();
-  const sc = h * perf.pr / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
-  pMat.uniforms.uScale.value = sc; emberMat.uniforms.uScale.value = sc; fxPass.uniforms.uRes.value.set(w * perf.pr, h * perf.pr);
+  updatePointScale(); fxPass.uniforms.uRes.value.set(w * perf.pr, h * perf.pr);
 }
+function updatePointScale() { const sc = innerHeight * perf.pr / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); pMat.uniforms.uScale.value = sc; emberMat.uniforms.uScale.value = sc; }
 window.addEventListener('resize', resize);
 let last = performance.now(), adaptT = 0;
 function loop(now) {
@@ -1320,7 +1337,7 @@ function loop(now) {
 refreshButtons(); refreshHints(); resize();
 function boot(models) {
   buildTemplates(models);
-  const pl = TEMPL.player.clone(true); pl.scale.setScalar(1.0); playerBank.add(pl);
+  const pl = TEMPL.player.clone(true); pl.scale.setScalar(1.45); playerBank.add(pl);
   const leg = $('legend');
   [['drifter', 'DRIFTER', 'wanders'], ['chaser', 'CHASER', 'hunts you'], ['splitter', 'SPLITTER', 'splits in 3'], ['dasher', 'DASHER', 'telegraphs · dashes']].forEach(([t, name, desc]) => {
     const obj = makeEnemyObject(t); obj.beam.visible = false; obj.model.scale.setScalar(ENEMY[t].r * 1.0); obj.root.visible = false; showcase.push({ t, obj });
