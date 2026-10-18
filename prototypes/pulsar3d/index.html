@@ -122,15 +122,7 @@
   .pp { position: absolute; left: 0; top: 0; font: 900 16px var(--h); white-space: nowrap; will-change: transform, opacity; text-shadow: 0 0 8px currentColor; }
   #stick, #aimStick { position: fixed; left: 0; top: 0; pointer-events: none; }
   #stick i, #aimStick i { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); }
-  #zones { position: fixed; inset: 0; pointer-events: none; }
-  .zone { position: absolute; bottom: calc(40px + var(--sb)); width: 120px; text-align: center; opacity: .55; transition: opacity .25s; }
-  .zone.zl { left: calc(28px + var(--sl)); } .zone.zr { right: calc(122px + var(--sr)); }
-  .zone i { display: block; width: 96px; height: 96px; margin: 0 auto 6px; border-radius: 50%; border: 2px dashed rgba(0,240,255,.55); }
-  .zone.zr i { border-color: rgba(255,46,136,.6); }
-  .zone b { font: 700 11px var(--h); letter-spacing: .16em; color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
-  .zone.zr b { color: var(--pink); text-shadow: 0 0 6px var(--pink); }
-  .zone.on { opacity: 0; }
-  body.touch #hint { bottom: calc(200px + var(--sb)); } body.touch #dash { display: none; } body.touch #powers { bottom: calc(170px + var(--sb)); }
+  body.touch #hint { bottom: calc(140px + var(--sb)); } body.touch #dash { display: none; } body.touch #powers { bottom: calc(130px + var(--sb)); }
   #aimStick .base { width: 110px; height: 110px; border: 2px solid rgba(255,46,136,.5); box-shadow: 0 0 14px rgba(255,46,136,.3), inset 0 0 14px rgba(255,46,136,.2); }
   #aimStick .knob { width: 46px; height: 46px; background: rgba(255,46,136,.25); border: 2px solid rgba(255,220,240,.7); box-shadow: 0 0 12px rgba(255,46,136,.6); }
   #stick .base { width: 110px; height: 110px; border: 2px solid rgba(0,240,255,.4); box-shadow: 0 0 14px rgba(0,240,255,.25), inset 0 0 14px rgba(0,240,255,.2); }
@@ -235,7 +227,7 @@
 <div id="pops"></div>
 <div id="stick" class="hidden"><i class="base"></i><i class="knob"></i></div>
 <div id="aimStick" class="hidden"><i class="base"></i><i class="knob"></i></div>
-<div id="zones" class="hidden"><div class="zone zl"><i></i><b>MOVE</b></div><div class="zone zr"><i></i><b>AIM &amp; FIRE</b></div></div>
+
 
 <button id="dashBtn" class="hidden" aria-label="Phase dash">DASH</button>
 <div id="btns">
@@ -1212,9 +1204,8 @@ canvas.addEventListener('pointerdown', e => {
   if (G.state !== 'playing') { if (G.state === 'title') primary(); return; }
   const grab = st => Object.assign(st, { active: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY });
   if (settings.aim === 'assist') { G.autoAim = true; if (!input.stick.active) grab(input.stick); else tryDash(); return; }
-  // twin-stick: left half moves, right half aims and fires while held
-  if (e.clientX < innerWidth * 0.5) { if (!input.stick.active) grab(input.stick); }
-  else if (!input.aim.active) grab(input.aim);
+  // first finger anywhere steers; an optional second finger aims
+  if (!input.stick.active) grab(input.stick); else if (!input.aim.active) grab(input.aim);
 }, { passive: false });
 window.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { input.sx = e.clientX; input.sy = e.clientY;
@@ -1283,14 +1274,14 @@ for (let i = 0; i < CONFIG.sparksPerMult; i++) hudEls.bar.appendChild(document.c
 const shipSvg = '<svg viewBox="0 0 24 24"><path d="M12 2 L20 21 L12 16 L4 21 Z" fill="rgba(0,240,255,.25)" stroke="#00F0FF" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 function renderLives() { hudEls.lives.innerHTML = shipSvg.repeat(Math.max(0, G.lives)); }
 function refreshHints() {
-  $('controls').innerHTML = input.touchMode ? (settings.aim === 'assist' ? 'drag to move · auto-aim on' : 'left thumb moves · right thumb aims &amp; fires · DASH button')
-    : '<span class="kbd">WASD</span>/<span class="kbd">ARROWS</span> move · <span class="kbd">MOUSE</span> aim · <span class="kbd">HOLD LEFT CLICK</span> fire · <span class="kbd">SHIFT</span>/<span class="kbd">SPACE</span>/<span class="kbd">RMB</span> dash · <span class="kbd">Y</span> daily · <span class="kbd">G</span> aim mode · <span class="kbd">P</span> pause · <span class="kbd">M</span> music · <span class="kbd">N</span> sfx · <span class="kbd">F</span> effects';
+  $('controls').innerHTML = input.touchMode ? (settings.aim === 'assist' ? 'drag to move · auto-aim on' : 'drag anywhere to move · auto-fire where you steer · DASH button')
+    : '<span class="kbd">WASD</span>/<span class="kbd">ARROWS</span> move · <span class="kbd">MOUSE</span> aim · auto-fire · <span class="kbd">SHIFT</span>/<span class="kbd">SPACE</span>/<span class="kbd">RMB</span> dash · <span class="kbd">Y</span> daily · <span class="kbd">G</span> aim mode · <span class="kbd">P</span> pause · <span class="kbd">M</span> music · <span class="kbd">N</span> sfx · <span class="kbd">F</span> effects';
   const assist = settings.aim === 'assist'; document.body.classList.toggle('touch', input.touchMode);
   hudEls.hint.querySelector('.a').textContent = input.touchMode
-    ? (assist ? 'DRAG TO MOVE · AUTO-AIM ON · DASH BUTTON' : 'LEFT THUMB MOVES · RIGHT THUMB AIMS & FIRES · DASH BUTTON')
-    : (assist ? 'WASD MOVE · AUTO-AIM ON · SHIFT / SPACE DASH' : 'WASD / ARROWS MOVE · MOUSE AIMS · HOLD LEFT BUTTON TO FIRE · SHIFT / SPACE DASH');
+    ? (assist ? 'DRAG TO MOVE · AUTO-AIM ON · DASH BUTTON' : 'DRAG ANYWHERE TO MOVE · YOU FIRE WHERE YOU STEER · DASH BUTTON')
+    : (assist ? 'WASD MOVE · AUTO-AIM ON · SHIFT / SPACE DASH' : 'WASD / ARROWS MOVE · AUTO-FIRE AT THE MOUSE · SHIFT / SPACE DASH');
   $('pauseHint').style.display = input.touchMode ? 'none' : ''; $('overKeys').style.display = input.touchMode ? 'none' : '';
-  $('aimMode').innerHTML = settings.aim === 'assist' ? 'AIM: <b>ASSIST</b> · auto-aims for you' : 'AIM: <b>MANUAL</b> · you aim and fire';
+  $('aimMode').innerHTML = settings.aim === 'assist' ? 'AIM: <b>ASSIST</b> · auto-aims for you' : 'AIM: <b>MANUAL</b> · auto-fire, you aim';
 }
 function showScreen(s) {
   $('title').classList.toggle('hidden', s !== 'title'); $('legend').classList.toggle('hidden', s !== 'title'); $('controls').classList.toggle('hidden', s !== 'title');
@@ -1365,8 +1356,7 @@ function updatePopups(dt) {
     p.el.style.transform = `translate(${(tmpV.x * 0.5 + 0.5) * innerWidth}px, ${(-tmpV.y * 0.5 + 0.5) * innerHeight}px) translate(-50%, -50%) scale(${sc})`; p.el.style.opacity = a; }
 }
 function updateStick() {
-  const zOn = G.state === 'playing' && input.touchMode && settings.aim !== 'assist'; $('zones').classList.toggle('hidden', !zOn);
-  if (zOn) { $('zones').children[0].classList.toggle('on', input.stick.active); $('zones').children[1].classList.toggle('on', input.aim.active); }
+
   for (const [s, id] of [[input.stick, 'stick'], [input.aim, 'aimStick']]) {
     const el = $(id), on = s.active && G.state === 'playing'; el.classList.toggle('hidden', !on); if (!on) continue;
     el.children[0].style.left = s.ox + 'px'; el.children[0].style.top = s.oy + 'px'; el.children[1].style.left = s.x + 'px'; el.children[1].style.top = s.y + 'px';
@@ -1405,13 +1395,15 @@ function updatePlayer(dt) {
   if (assist) { // accessibility: aims at the nearest enemy and fires on its own
     if (G.autoAim || input.touchMode) { const t = nearestEnemy(player.x, player.z); if (t) { aimAng = Math.atan2(t.z - player.z, t.x - player.x); firing = true; } }
     else { screenToWorld(input.sx, input.sy); aimAng = Math.atan2(input.mz - player.z, input.mx - player.x); firing = true; }
-  } else if (input.touchMode) { // right thumb: aim stick, fires while held
-    const a2 = input.aim; if (a2.active) { const dx = a2.x - a2.ox, dy = a2.y - a2.oy; if (Math.hypot(dx, dy) > 10) { aimAng = Math.atan2(dy, dx); firing = true; } }
-  } else { // the mouse aims; hold the left button to fire
-    screenToWorld(input.sx, input.sy); aimAng = Math.atan2(input.mz - player.z, input.mx - player.x); firing = input.mouseDown;
+  } else if (input.touchMode) { // auto-fire where the ship points; it points where you steer (an optional 2nd finger aims)
+    const a2 = input.aim; if (a2.active) { const dx = a2.x - a2.ox, dy = a2.y - a2.oy; if (Math.hypot(dx, dy) > 10) aimAng = Math.atan2(dy, dx); }
+    firing = true;
+  } else { // auto-fire at the mouse cursor (keyboard-only players fire where they steer)
+    if (input.mouseMoved) { screenToWorld(input.sx, input.sy); aimAng = Math.atan2(input.mz - player.z, input.mx - player.x); }
+    firing = true;
   }
   const turn = (want, rate) => { const da = ((want - player.ang + Math.PI * 3) % TAU) - Math.PI; player.ang += da * Math.min(1, dt * rate); return da; };
-  if (aimAng != null) turn(aimAng, 24); else if (ml > 0.1) turn(Math.atan2(mz, mx), 10);
+  if (aimAng != null) turn(aimAng, 24); else if (ml > 0.1) turn(Math.atan2(mz, mx), 14);
   // bank into lateral motion
   const fx = Math.cos(player.ang), fz = Math.sin(player.ang), lat = (player.vx * -fz + player.vz * fx) / CONFIG.playerSpeed;
   player.bank = lerp(player.bank, -lat * 1.0, Math.min(1, dt * 8));
@@ -1561,7 +1553,7 @@ function syncScene(dt) {
   shieldMesh.rotation.set(time * 0.7, time * 1.1, 0);
   headingObj.visible = pv && !player.dead; headingObj.position.set(player.x, 0, player.z); headingObj.rotation.y = playerObj.rotation.y;
   reticle.visible = playing && !input.touchMode && !(settings.aim === 'assist' && G.autoAim) && !player.dead;
-  reticle.material.color.copy(input.mouseDown || settings.aim === 'assist' ? hdrC(HEX.player, 2.2) : hdrC(HEX.player, 0.8)); reticle.position.set(input.mx, 0.07, input.mz); reticle.rotation.y = time;
+  reticle.visible = reticle.visible && input.mouseMoved; reticle.position.set(input.mx, 0.07, input.mz); reticle.rotation.y = time;
   updateTrail(player.x, player.z, py, player.ang, pv && !player.dead);
 
   // enemies

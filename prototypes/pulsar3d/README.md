@@ -30,15 +30,15 @@ python3 -m http.server 8000
 Three.js 0.170 is loaded from jsDelivr through an import map, so the page needs
 internet access.
 
-**Controls**: manual twin-stick aiming (the default)
+**Controls**: auto-fire, and you aim
 
-| Device | Move | Aim and fire | Dash | Menus |
+| Device | Move | Aim | Dash | Menus |
 |---|---|---|---|---|
-| Desktop | WASD or arrow keys | the mouse aims; hold the left button to fire | `SHIFT`, `SPACE` or right-click | `P`/`Esc` pause, `R` restart, `T` main menu, `M`/`N`/`F` music, sfx, effects, `G` aim mode |
-| Mobile | left thumb (floating stick, MOVE zone) | right thumb: aim stick, fires while held (AIM &amp; FIRE zone) | DASH button | pause button at top right, with RESUME, RESTART and MAIN MENU |
+| Desktop | WASD or arrow keys | the mouse: the ship fires on its own at the cursor | `SHIFT` or `SPACE` | `P`/`Esc` pause, `R` restart, `T` main menu, `M`/`N`/`F` music, sfx, effects, `G` aim mode |
+| Mobile | one finger, dragged anywhere | the ship fires where you steer; an optional second finger aims | DASH button | pause button at top right, with RESUME, RESTART and MAIN MENU |
 
-The game never shoots by itself unless you turn on **AIM: ASSIST** on the title
-screen. That is an accessibility option that aims and fires at the nearest enemy.
+The ship never turns towards enemies on its own. **AIM: ASSIST** on the title
+screen brings back automatic aiming, as an accessibility option.
 
 Modes: **PLAY** (arcade) and **DAILY PULSE** (`Y`), where everyone gets the same
 seeded run each day.
