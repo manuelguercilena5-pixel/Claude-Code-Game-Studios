@@ -1332,11 +1332,14 @@ function boot(models) {
   G.state = 'title'; showScreen('title'); playerObj.visible = false; playerShadow.visible = false;
   const l = $('loading'); l.style.opacity = 0; setTimeout(() => l.remove(), 700);
 }
-new GLTFLoader().load('assets/pulsar.glb', gltf => {
+const onModels = gltf => {
   const m = {}; gltf.scene.traverse(o => { if (['Player', 'Drifter', 'Chaser', 'Splitter', 'Dasher'].includes(o.name)) m[o.name] = o; });
   const fb = fallbackModels(); for (const k of Object.keys(fb)) if (!m[k]) m[k] = fb[k];
   boot(m);
-}, undefined, err => { console.warn('GLB failed, using fallback geometry', err); boot(fallbackModels()); });
+}, onModelFail = err => { console.warn('GLB failed, using fallback geometry', err); boot(fallbackModels()); };
+// hosts that cannot serve .glb (e.g. the published artifact) ship it as base64 in assets/pulsar-glb.js instead
+if (window.PULSAR_GLB) { const bin = Uint8Array.from(atob(window.PULSAR_GLB), c => c.charCodeAt(0)); new GLTFLoader().parse(bin.buffer, '', onModels, onModelFail); }
+else new GLTFLoader().load('assets/pulsar.glb', onModels, undefined, onModelFail);
 requestAnimationFrame(loop);
 window.PULSAR = { G, player, get enemies() { return enemies; }, startGame, spawnEnemy, CONFIG, settings, perf, camera, scene, dbg: { playerObj, trail, playerShadow, playerLight, points, bulletMesh, sparkMesh, debrisMesh } };
 </script>
