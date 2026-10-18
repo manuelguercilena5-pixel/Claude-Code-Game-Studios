@@ -173,6 +173,23 @@
   @media (max-width: 760px) { #bossWrap { top: calc(150px + var(--st)); } #sector { left: 0; right: 0; text-align: center; top: calc(62px + var(--st)); } #multWrap { top: calc(80px + var(--st)); } #stats { grid-template-columns: repeat(5, minmax(54px, 1fr)); } }
   #err { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--fg); font: 600 18px var(--b); padding: 24px; text-align: center; }
 </style>
+<script>
+  // startup diagnostics: if anything fails before the game boots, say so on screen instead of a black page
+  window.__pulsarErrors = [];
+  (function () {
+    function show(title) {
+      var d = document.getElementById('err');
+      if (!d) { d = document.createElement('div'); d.id = 'err'; (document.body || document.documentElement).appendChild(d); }
+      d.style.cssText = 'position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;background:#05010F;color:#E8FFFF;font:600 15px system-ui,sans-serif;text-align:center';
+      d.innerHTML = '<b style="font-size:18px;color:#FF2E88">' + title + '</b><span>Send a screenshot of this screen to fix it.</span><code style="max-width:92vw;white-space:pre-wrap;word-break:break-word;font:12px monospace;color:#9AF7FF"></code>';
+      d.querySelector('code').textContent = window.__pulsarErrors.slice(-6).join('\n') + '\n' + (window.__pulsarGpu || '');
+    }
+    window.__pulsarShow = show;
+    window.addEventListener('error', function (e) { window.__pulsarErrors.push((e.message || 'error') + (e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : '')); if (!window.PULSAR || window.PULSAR.G.state === 'loading') show('PULSAR could not start'); });
+    window.addEventListener('unhandledrejection', function (e) { window.__pulsarErrors.push('promise: ' + (e.reason && e.reason.message || e.reason)); });
+    setTimeout(function () { if (!window.PULSAR || window.PULSAR.G.state === 'loading') { window.__pulsarErrors.push('boot timeout (15 s)'); show('PULSAR could not start'); } }, 15000);
+  })();
+</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
@@ -505,7 +522,11 @@ const flashLights = [0, 1, 2].map(() => { const l = new THREE.PointLight('#fffff
 const MOBILE = (() => { try { return matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } })();
 const perf = { avg: 16.7, pr: Math.min(window.devicePixelRatio || 1, MOBILE ? 1.25 : 1.75), quality: 1 };
 // MSAA on the HDR target: without it rims, wireframes and model edges shimmer
-const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: MOBILE ? 2 : 4 }));
+// MSAA on half-float targets needs EXT_color_buffer_float; many phone GPUs lack it and would render a black frame
+const canMSAA = !MOBILE && renderer.capabilities.isWebGL2 && renderer.extensions.has('EXT_color_buffer_float'); // phones: off (dense screens, battery, driver risk)
+try { const dbg = renderer.getContext().getExtension('WEBGL_debug_renderer_info');
+  window.__pulsarGpu = 'GPU: ' + (dbg ? renderer.getContext().getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'unknown') + ' · MSAA ' + (canMSAA ? 'on' : 'off'); } catch (e) {}
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: canMSAA ? (MOBILE ? 2 : 4) : 0 }));
 composer.addPass(new RenderPass(scene, camera));
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.7, 0.4, 0.85);
 { const scale = MOBILE ? 0.5 : 1; const base = UnrealBloomPass.prototype.setSize; // UnrealBloom halves internally; phones get quarter-res bloom
@@ -1702,7 +1723,23 @@ function loop(now) {
   if (G.state === 'playing' || G.state === 'paused' || G.state === 'draft') updateHUD();
   else if (G.state === 'over') { const f = fmt(G.score * Math.min(1, (G.overT / 0.7) ** 0.6)); if (lastHud.final !== f) { $('final').textContent = f; lastHud.final = f; } }
   updatePopups(G.state === 'paused' ? 0 : dt); updateStick();
-  composer.render(dt);
+  if (safeMode < 2) composer.render(dt); else renderer.render(scene, camera);
+  if (G.state !== 'loading' && blackChecks < 4 && ++framesSinceBoot % 45 === 0) watchBlack();
+}
+// If the GPU produces an all-black frame (unsupported render-target format, driver bug), step down automatically:
+// 1 = no MSAA, 2 = no post-processing at all (direct render with tone mapping).
+let safeMode = 0, framesSinceBoot = 0, blackChecks = 0;
+function watchBlack() {
+  blackChecks++;
+  renderer.setRenderTarget(null);
+  const gl = renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, px = new Uint8Array(4); let lit = 0;
+  for (let i = 1; i <= 3; i++) for (let j = 1; j <= 3; j++) { gl.readPixels(Math.floor(w * i / 4), Math.floor(h * j / 4), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); if (px[0] + px[1] + px[2] > 6) lit++; }
+  if (lit > 0) { blackChecks = 99; return; } // the picture is fine: stop checking
+  safeMode++;
+  window.__pulsarErrors.push('black frame -> safe mode ' + safeMode);
+  if (safeMode === 1) { for (const rt of [composer.renderTarget1, composer.renderTarget2]) { rt.samples = 0; rt.dispose(); } }
+  if (safeMode >= 2) { renderer.toneMapping = TONE; renderer.setRenderTarget(null); }
+  if (safeMode > 2) window.__pulsarShow && window.__pulsarShow('The screen stays black on this device');
 }
 
 // =====================================================================
@@ -1732,7 +1769,7 @@ const onModels = gltf => {
 if (window.PULSAR_GLB) { const bin = Uint8Array.from(atob(window.PULSAR_GLB), c => c.charCodeAt(0)); new GLTFLoader().parse(bin.buffer, '', onModels, onModelFail); }
 else new GLTFLoader().load('assets/pulsar.glb', onModels, undefined, onModelFail);
 requestAnimationFrame(loop);
-window.PULSAR = { G, player, get enemies() { return enemies; }, startGame, spawnEnemy, CONFIG, settings, perf, camera, scene, dbg: { playerObj, trail, playerShadow, playerLight, points, bulletMesh, sparkMesh, debrisMesh } };
+window.PULSAR = { get safeMode() { return safeMode; }, recheckBlack() { blackChecks = 0; framesSinceBoot = 0; }, composer, G, player, get enemies() { return enemies; }, startGame, spawnEnemy, CONFIG, settings, perf, camera, scene, dbg: { playerObj, trail, playerShadow, playerLight, points, bulletMesh, sparkMesh, debrisMesh } };
 </script>
 </body>
 </html>
