@@ -67,6 +67,58 @@ Phase 1 adds:
 - **Spelunky-style daily.** Only the first attempt of the day is official; later
   ones are marked PRACTICE. Plus a daily streak counter.
 
+## Visual Pass 1 (art direction, technical art and performance review)
+
+Three specialists reviewed the game. The art-director looked at screenshots
+against Geometry Wars, Resogun, Nex Machina and Thumper. The technical-artist
+audited the rendering code. The performance-analyst audited mobile cost.
+
+- **Signature.** The stock synthwave sunset is replaced by a **pulsar**: a
+  white-blue core with twin beams that rotate once every two bars of the music.
+  The same beams sweep across the arena floor during play.
+- **Value hierarchy.**
+  - The floor grid is darker. Minor lines are dim and fade with distance, which
+    removes moiré. Only the major lines glow. Floor lighting is clamped.
+  - The wake left by the ship is softer.
+- **One material language.** Every enemy is a dark body with a fresnel rim in its
+  own colour, so Chasers no longer read as black holes.
+- **One hue per role.**
+  - The Dasher is now orange (#FF8A00), so it no longer shares yellow with the
+    sparks.
+  - Boss orbs are red (#FF3B5C) with a white-hot core.
+- **Image quality.**
+  - MSAA on the HDR target: 4× desktop, 2× mobile.
+  - Khronos **Neutral** tone mapping instead of ACES, chosen by A/B against ACES
+    and AgX (`evidence/visual1-tonemap-ab.jpg`). Neutral keeps neon hues
+    saturated.
+  - Bloom retuned to threshold 0.85, strength 0.7, radius 0.4.
+- **Camera.** About 61° pitch on desktop and about 72° in portrait.
+- **Performance on phones.**
+  - 60 fps cap, so 120 Hz Samsung panels no longer render twice the frames.
+  - Quarter-resolution bloom and render scale ≤ 1.25 on mobile.
+  - Polar floor mesh with no fragment `discard`.
+  - Sky, pulsar and mountains are switched off once the camera looks down at
+    the arena.
+  - Partial particle uploads and a point-size clamp.
+  - WebView renderer priority set to `IMPORTANT`, and `appCategory="game"`.
+- **UI.**
+  - Opaque upgrade overlay. Cards are coded by category: OFFENSE cyan, SCORE
+    gold, UTILITY green.
+  - Mobile HUD collisions fixed.
+  - The aim-mode chip moved to a corner.
+- **Feel.**
+  - Haptics on touch: kills, dash, PHASE, pickups, hits, boss. Off in calm mode.
+  - Bullet-time on boss kills, OVERCHARGE and 30+ chains.
+  - The music goes to full intensity during the boss.
+
+**Not done yet** (bigger rewrites flagged by the review):
+- Instanced enemies (about 800 draws down to about 25).
+- A custom logotype.
+- A pulsar-shaped player ship that no longer shares the Dasher's arrowhead
+  silhouette.
+- A bespoke Warden model.
+- A fixed-timestep simulation.
+
 Next, from the same research: achievements that unlock cosmetic ships and trails
 (options, not power), a Pacifism mode, a ghost of your best run, and a second boss
 (Hydra).
@@ -130,3 +182,4 @@ Market-driven decisions:
 | ![](evidence/blender-models.jpg) | Blender renders (Cycles) of the models |
 | ![](evidence/phase1-draft.jpg) | ![](evidence/phase1-boss2.jpg) |
 | ![](evidence/phase1-over.jpg) | ![](evidence/phase1-mobile-cards.jpg) |
+| ![](evidence/visual1-title.jpg) | ![](evidence/visual1-action.jpg) |

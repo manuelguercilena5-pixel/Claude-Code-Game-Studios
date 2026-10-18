@@ -71,6 +71,8 @@ public class MainActivity extends Activity {
             }
         });
 
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false); // keep the GPU process at full priority
         setContentView(web);
         hideSystemBars();
         web.loadUrl("https://" + HOST + "/index.html");
