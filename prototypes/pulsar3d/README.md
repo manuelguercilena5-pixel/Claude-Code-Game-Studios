@@ -30,18 +30,18 @@ python3 -m http.server 8000
 Three.js 0.170 is loaded from jsDelivr through an import map, so the page needs
 internet access.
 
-**Controls**
+**Controls**: manual twin-stick aiming (the default)
 
-| Device | Controls |
-|---|---|
-| Desktop | WASD or arrows move · the mouse aims · fire is automatic · `P` pause · `M` music · `N` sfx · `F` effects full/calm · `T` menu |
-| Mobile | drag anywhere to move (floating stick) · aim and fire are automatic |
+| Device | Move | Aim and fire | Dash | Menus |
+|---|---|---|---|---|
+| Desktop | WASD | hold the left mouse button (fires at the cursor), or the arrow keys | `SHIFT`, `SPACE` or right-click | `P`/`Esc` pause, `R` restart, `T` main menu, `M`/`N`/`F` music, sfx, effects, `G` aim mode |
+| Mobile | left thumb (floating stick) | right thumb: aim stick, fires while held | DASH button | pause button at top right, with RESUME, RESTART and MAIN MENU |
+
+The game never shoots by itself unless you turn on **AIM: ASSIST** on the title
+screen. That is an accessibility option that aims and fires at the nearest enemy.
 
 Modes: **PLAY** (arcade) and **DAILY PULSE** (`Y`), where everyone gets the same
 seeded run each day.
-
-**Phase dash:** `SHIFT`, `SPACE` or right-click on desktop; the DASH button or a
-second finger on mobile.
 
 ## Phase 1: depth (from player and market research)
 

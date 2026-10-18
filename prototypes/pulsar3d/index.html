@@ -99,8 +99,15 @@
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
   #stats div small { display: block; font: 700 11px var(--b); letter-spacing: .2em; color: var(--dim); }
   #stats div b { font: 900 20px var(--h); }
-  #retry { margin-top: 26px; font: 900 20px var(--h); color: var(--cyan); letter-spacing: .1em; text-shadow: 0 0 12px var(--cyan); animation: blink 1.2s ease-in-out infinite; }
-  #menuHint { font: 600 13px var(--b); color: rgba(232,255,255,.45); margin-top: 8px; pointer-events: auto; cursor: pointer; }
+  .menu { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; justify-content: center; pointer-events: auto; }
+  .mbtn { --c: var(--cyan); min-width: 150px; padding: 13px 18px; font: 900 15px var(--h); letter-spacing: .12em; color: var(--fg); cursor: pointer;
+    background: color-mix(in srgb, var(--c) 14%, rgba(5,1,15,.7)); border: 2px solid var(--c); box-shadow: inset 0 0 16px color-mix(in srgb, var(--c) 30%, transparent);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); transition: background .15s, transform .1s; }
+  .mbtn:hover, .mbtn:focus-visible { background: color-mix(in srgb, var(--c) 30%, rgba(5,1,15,.7)); transform: translateY(-2px); outline: none; }
+  .mbtn.pri { animation: breathe 2s ease-in-out infinite; }
+  .mbtn.alt { --c: var(--pink); }
+  .mbtn.dim { --c: rgba(232,255,255,.5); }
+  .keys { font: 600 13px var(--b); color: rgba(232,255,255,.45); margin-top: 10px; }
   @keyframes blink { 50% { opacity: .45; } }
   #pause { background: rgba(5,1,15,.6); }
   #pause h2 { font: 900 clamp(40px, 9vw, 64px) var(--h); color: var(--cyan); margin: 0; text-shadow: 0 0 14px var(--cyan), 0 0 40px var(--cyan); letter-spacing: .1em; }
@@ -113,8 +120,10 @@
   @keyframes bn { 0% { opacity: 0; transform: scale(1.7); } 10% { opacity: 1; transform: scale(1); } 80% { opacity: 1; transform: scale(1.04); } 100% { opacity: 0; transform: scale(1.06); } }
   #pops { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
   .pp { position: absolute; left: 0; top: 0; font: 900 16px var(--h); white-space: nowrap; will-change: transform, opacity; text-shadow: 0 0 8px currentColor; }
-  #stick { position: fixed; left: 0; top: 0; pointer-events: none; }
-  #stick i { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); }
+  #stick, #aimStick { position: fixed; left: 0; top: 0; pointer-events: none; }
+  #stick i, #aimStick i { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); }
+  #aimStick .base { width: 110px; height: 110px; border: 2px solid rgba(255,46,136,.5); box-shadow: 0 0 14px rgba(255,46,136,.3), inset 0 0 14px rgba(255,46,136,.2); }
+  #aimStick .knob { width: 46px; height: 46px; background: rgba(255,46,136,.25); border: 2px solid rgba(255,220,240,.7); box-shadow: 0 0 12px rgba(255,46,136,.6); }
   #stick .base { width: 110px; height: 110px; border: 2px solid rgba(0,240,255,.4); box-shadow: 0 0 14px rgba(0,240,255,.25), inset 0 0 14px rgba(0,240,255,.2); }
   #stick .knob { width: 46px; height: 46px; background: rgba(0,240,255,.22); border: 2px solid rgba(232,255,255,.6); box-shadow: 0 0 12px rgba(0,240,255,.5); }
   #loading { background: var(--bg); font: 700 14px var(--h); letter-spacing: .3em; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); transition: opacity .6s; }
@@ -157,7 +166,7 @@
     box-shadow: inset 0 0 12px rgba(255,46,136,.25); }
   .sbtn:hover { background: rgba(255,46,136,.18); }
   @media (max-height: 600px) { .go { font-size: clamp(34px, 7vw, 56px); } #final { font-size: 40px; margin-top: 0; } #rank { margin-top: 6px; }
-    #stats { margin-top: 10px; padding: 8px; } #build { margin-top: 8px; } #shareRow { margin-top: 10px; } #retry { margin-top: 12px; font-size: 17px; } }
+    #stats { margin-top: 10px; padding: 8px; } #build { margin-top: 8px; } #shareRow { margin-top: 10px; } .menu { margin-top: 12px; } .mbtn { padding: 10px 14px; } }
   @media (max-width: 760px) { #bossWrap { top: calc(150px + var(--st)); } #sector { top: calc(92px + var(--st)); } #stats { grid-template-columns: repeat(5, minmax(54px, 1fr)); } }
   #err { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--fg); font: 600 18px var(--b); padding: 24px; text-align: center; }
 </style>
@@ -192,6 +201,7 @@
     <button class="mode" id="daily"><b>DAILY PULSE</b><small id="dailySub">same run for everyone · Y</small></button>
   </div>
   <div id="bestLine"></div>
+  <button id="aimMode" class="sbtn" style="margin-top:14px;pointer-events:auto;border-color:var(--cyan)">AIM: MANUAL</button>
 </div>
 <div id="legend" class="hidden"></div>
 <div id="controls"></div>
@@ -205,14 +215,17 @@
   <div id="stats"></div>
   <div id="build"></div>
   <div id="shareRow"><button class="sbtn" id="shareBtn">COPY RESULT</button></div>
-  <div id="retry">CLICK · SPACE TO RETRY</div>
-  <div id="menuHint">T · menu</div>
+  <div class="menu"><button class="mbtn pri" id="retryBtn">RETRY</button><button class="mbtn dim" id="overMenuBtn">MAIN MENU</button></div>
+  <div class="keys" id="overKeys">R · retry &nbsp; T · menu</div>
 </div>
 <div id="draft" class="layer ov hidden"><h3>CHOOSE AN UPGRADE</h3><p id="draftSub">pick one · keys 1 2 3</p><div id="cards"></div></div>
-<div id="pause" class="layer ov hidden"><h2>PAUSED</h2><p id="pauseHint">click · space · P to continue</p></div>
+<div id="pause" class="layer ov hidden"><h2>PAUSED</h2>
+  <div class="menu"><button class="mbtn pri" id="resumeBtn">RESUME</button><button class="mbtn alt" id="restartBtn">RESTART</button><button class="mbtn dim" id="pauseMenuBtn">MAIN MENU</button></div>
+  <p id="pauseHint">P · resume &nbsp; R · restart &nbsp; T · menu</p></div>
 <div id="banners"></div>
 <div id="pops"></div>
 <div id="stick" class="hidden"><i class="base"></i><i class="knob"></i></div>
+<div id="aimStick" class="hidden"><i class="base"></i><i class="knob"></i></div>
 
 <button id="dashBtn" class="hidden" aria-label="Phase dash">DASH</button>
 <div id="btns">
@@ -302,7 +315,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
 };
 const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
-const settings = Object.assign({ music: true, sfx: true, fx: reduceMotion ? 'calm' : 'full' }, store.get('pulsar3d_settings', {}));
+const settings = Object.assign({ music: true, sfx: true, fx: reduceMotion ? 'calm' : 'full', aim: 'manual' }, store.get('pulsar3d_settings', {}));
+if (settings.aim !== 'assist') settings.aim = 'manual'; // manual (twin-stick) is the real game; assist is an accessibility option
 let best = Object.assign({ score: 0, mult: 1, chain: 0, time: 0 }, store.get('pulsar3d_best', {}));
 let dailyBest = Object.assign({ day: '', score: 0, attempts: 0 }, store.get('pulsar3d_daily', {}));
 let streak = Object.assign({ last: '', n: 0 }, store.get('pulsar3d_streak', {}));
@@ -887,7 +901,8 @@ const powerDur = () => CONFIG.powerDuration + (mod('battery') ? 4 : 0);
 const invulnerable = () => player.invuln > 0 || player.dashT > 0;
 const curSector = () => SECTORS[G.sectorN % SECTORS.length];
 const speedScale = () => curSector().speed * (1 + 0.15 * Math.floor(G.sectorN / SECTORS.length));
-const input = { keys: {}, mx: 0, mz: 0, sx: 0, sy: 0, mouseMoved: false, touchMode: false, stick: { active: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 } };
+const input = { keys: {}, mx: 0, mz: 0, sx: 0, sy: 0, mouseMoved: false, mouseDown: false, touchMode: false,
+  stick: { active: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 }, aim: { active: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 } };
 try { if (matchMedia('(pointer: coarse)').matches) input.touchMode = true; } catch (e) {}
 
 function clearWorld() {
@@ -1163,27 +1178,44 @@ function primary() {
   else if (G.state === 'paused') togglePause();
 }
 function togglePause() {
-  if (G.state === 'playing') { G.state = 'paused'; showScreen('pause'); if (Sound.ctx) Sound.ctx.suspend().catch(() => {}); }
+  if (G.state === 'playing') { G.state = 'paused'; input.stick.active = false; input.aim.active = false; input.mouseDown = false; showScreen('pause'); if (Sound.ctx) Sound.ctx.suspend().catch(() => {}); }
   else if (G.state === 'paused') { G.state = 'playing'; showScreen('play'); Sound.init(); if (Sound.ctx) Sound.ctx.resume().catch(() => {}); }
 }
-function goTitle() { if (G.state !== 'over') return; clearWorld(); G.state = 'title'; Sound.setMode('title'); showScreen('title'); }
+function goTitle() {
+  if (G.state !== 'over' && G.state !== 'paused') return;
+  G.runId++; clearWorld(); bossUI(false); G.boss = null; G.state = 'title'; playerObj.visible = false; playerShadow.visible = false;
+  if (Sound.ctx) Sound.ctx.resume().catch(() => {}); Sound.setMode('title'); showScreen('title');
+}
+function restartRun() {
+  if (G.state !== 'over' && G.state !== 'paused') return;
+  if (G.state === 'over' && G.overT < CONFIG.restartLock) return;
+  if (Sound.ctx) Sound.ctx.resume().catch(() => {}); startGame();
+}
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault(); canvas.focus(); Sound.init();
-  if (e.pointerType === 'mouse') { input.sx = e.clientX; input.sy = e.clientY; if (G.state === 'playing' && e.button === 2) tryDash(); else if (G.state !== 'playing') primary(); return; }
-  input.touchMode = true; refreshHints();
-  if (G.state === 'playing') { G.autoAim = true;
-    if (!input.stick.active) Object.assign(input.stick, { active: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY });
-    else tryDash(); } // a second finger dashes
-  else primary();
+  if (e.pointerType === 'mouse') { input.sx = e.clientX; input.sy = e.clientY;
+    if (G.state === 'playing') { if (e.button === 2) tryDash(); else if (e.button === 0) input.mouseDown = true; }
+    else if (G.state === 'title') primary();
+    return; }
+  if (!input.touchMode) { input.touchMode = true; refreshHints(); }
+  if (G.state !== 'playing') { if (G.state === 'title') primary(); return; }
+  const grab = st => Object.assign(st, { active: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY });
+  if (settings.aim === 'assist') { G.autoAim = true; if (!input.stick.active) grab(input.stick); else tryDash(); return; }
+  // twin-stick: left half moves, right half aims and fires while held
+  if (e.clientX < innerWidth * 0.5) { if (!input.stick.active) grab(input.stick); }
+  else if (!input.aim.active) grab(input.aim);
 }, { passive: false });
 window.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse') { input.sx = e.clientX; input.sy = e.clientY;
     if (!input.mouseMoved && G.state === 'playing') { G.autoAim = false; refreshHints(); } input.mouseMoved = true; if (input.touchMode) { input.touchMode = false; refreshHints(); } return; }
-  const s = input.stick; if (s.active && e.pointerId === s.id) { s.x = e.clientX; s.y = e.clientY;
+  for (const s of [input.stick, input.aim]) if (s.active && e.pointerId === s.id) { s.x = e.clientX; s.y = e.clientY;
     const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), R = 70; if (d > R) { s.ox = s.x - dx / d * R; s.oy = s.y - dy / d * R; } }
 });
-const endStick = e => { if (input.stick.active && e.pointerId === input.stick.id) input.stick.active = false; };
+const endStick = e => {
+  if (e.pointerType === 'mouse') { input.mouseDown = false; return; }
+  for (const s of [input.stick, input.aim]) if (s.active && e.pointerId === s.id) s.active = false;
+};
 window.addEventListener('pointerup', endStick); window.addEventListener('pointercancel', endStick);
 window.addEventListener('keydown', e => {
   const k = e.code; Sound.init();
@@ -1194,16 +1226,17 @@ window.addEventListener('keydown', e => {
   if (G.state === 'draft' && /^(Digit|Numpad)[123]$/.test(k)) { chooseCard(+k.slice(-1) - 1); return; }
   if ((k === 'Space' || k === 'ShiftLeft' || k === 'ShiftRight') && G.state === 'playing') tryDash();
   else if (k === 'Space' || k === 'Enter') primary();
-  else if (k === 'KeyR' && G.state === 'over' && G.overT > CONFIG.restartLock) startGame();
+  else if (k === 'KeyR' && (G.state === 'over' || G.state === 'paused')) restartRun();
   else if (k === 'KeyY' && G.state === 'title') startGame('daily');
   else if (k === 'KeyT' || (k === 'Escape' && G.state === 'over')) goTitle();
+  else if (k === 'KeyG' && G.state === 'title') toggleSetting('aim');
   else if (k === 'Escape' || k === 'KeyP') togglePause();
   else if (k === 'KeyM') toggleSetting('music');
   else if (k === 'KeyN') toggleSetting('sfx');
   else if (k === 'KeyF') toggleSetting('fx');
 });
 window.addEventListener('keyup', e => { input.keys[e.code] = false; });
-const autoPause = () => { input.keys = {}; input.stick.active = false; if (G.state === 'playing') togglePause(); };
+const autoPause = () => { input.keys = {}; input.stick.active = false; input.aim.active = false; input.mouseDown = false; if (G.state === 'playing') togglePause(); };
 window.addEventListener('blur', autoPause);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { autoPause(); if (Sound.ctx) Sound.ctx.suspend().catch(() => {}); }
@@ -1212,8 +1245,8 @@ document.addEventListener('visibilitychange', () => {
 
 // buttons
 function toggleSetting(id) {
-  if (id === 'fx') settings.fx = settings.fx === 'full' ? 'calm' : 'full'; else settings[id] = !settings[id];
-  store.set('pulsar3d_settings', settings); Sound.applySettings(); Sound.click(); refreshButtons();
+  if (id === 'fx') settings.fx = settings.fx === 'full' ? 'calm' : 'full'; else if (id === 'aim') settings.aim = settings.aim === 'assist' ? 'manual' : 'assist'; else settings[id] = !settings[id];
+  store.set('pulsar3d_settings', settings); Sound.applySettings(); Sound.click(); refreshButtons(); refreshHints();
 }
 function refreshButtons() {
   $('bMusic').classList.toggle('off', !settings.music); $('bSfx').classList.toggle('off', !settings.sfx); $('bFx').classList.toggle('off', settings.fx !== 'full');
@@ -1222,10 +1255,9 @@ function refreshButtons() {
 }
 const onBtn = (id, fn) => { const b = $(id); b.addEventListener('pointerdown', e => { e.stopPropagation(); }); b.addEventListener('click', e => { e.stopPropagation(); Sound.init(); fn(); b.blur(); }); };
 onBtn('bMusic', () => toggleSetting('music')); onBtn('bSfx', () => toggleSetting('sfx')); onBtn('bFx', () => toggleSetting('fx')); onBtn('bPause', togglePause);
-onBtn('play', () => startGame('arcade')); onBtn('daily', () => startGame('daily'));
-$('menuHint').addEventListener('click', e => { e.stopPropagation(); goTitle(); });
-$('over').addEventListener('pointerdown', e => { if (e.target.id === 'menuHint') return; Sound.init(); if (e.pointerType !== 'mouse') input.touchMode = true; primary(); });
-$('pause').addEventListener('pointerdown', () => primary());
+onBtn('play', () => startGame('arcade')); onBtn('daily', () => startGame('daily')); onBtn('aimMode', () => toggleSetting('aim'));
+onBtn('retryBtn', restartRun); onBtn('overMenuBtn', goTitle);
+onBtn('resumeBtn', () => { if (G.state === 'paused') togglePause(); }); onBtn('restartBtn', restartRun); onBtn('pauseMenuBtn', goTitle);
 { const db = $('dashBtn'); db.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); Sound.init(); tryDash(); }); }
 $('shareBtn').addEventListener('pointerdown', e => e.stopPropagation());
 $('shareBtn').addEventListener('click', e => { e.stopPropagation(); const b = $('shareBtn'), txt = shareText();
@@ -1241,11 +1273,14 @@ for (let i = 0; i < CONFIG.sparksPerMult; i++) hudEls.bar.appendChild(document.c
 const shipSvg = '<svg viewBox="0 0 24 24"><path d="M12 2 L20 21 L12 16 L4 21 Z" fill="rgba(0,240,255,.25)" stroke="#00F0FF" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 function renderLives() { hudEls.lives.innerHTML = shipSvg.repeat(Math.max(0, G.lives)); }
 function refreshHints() {
-  $('controls').innerHTML = input.touchMode ? 'drag anywhere to move · auto-aim &amp; auto-fire'
-    : '<span class="kbd">WASD</span> move · <span class="kbd">MOUSE</span> aim · auto-fire · <span class="kbd">SHIFT</span>/<span class="kbd">SPACE</span>/<span class="kbd">RMB</span> dash · <span class="kbd">Y</span> daily · <span class="kbd">P</span> pause · <span class="kbd">M</span> music · <span class="kbd">N</span> sfx · <span class="kbd">F</span> effects';
-  hudEls.hint.querySelector('.a').textContent = input.touchMode ? 'DRAG TO MOVE · DASH BUTTON OR 2ND FINGER' : (G.autoAim ? 'WASD MOVE · SPACE / SHIFT DASH · AUTO-AIM' : 'WASD MOVE · MOUSE AIM · SHIFT / SPACE / RIGHT-CLICK DASH');
-  $('pauseHint').textContent = input.touchMode ? 'tap to continue' : 'click · space · P to continue';
-  $('retry').textContent = input.touchMode ? 'TAP TO RETRY' : 'R · SPACE · CLICK TO RETRY';
+  $('controls').innerHTML = input.touchMode ? (settings.aim === 'assist' ? 'drag to move · auto-aim on' : 'left thumb moves · right thumb aims &amp; fires · DASH button')
+    : '<span class="kbd">WASD</span> move · <span class="kbd">HOLD MOUSE</span>/<span class="kbd">ARROWS</span> fire · <span class="kbd">SHIFT</span>/<span class="kbd">SPACE</span>/<span class="kbd">RMB</span> dash · <span class="kbd">Y</span> daily · <span class="kbd">G</span> aim mode · <span class="kbd">P</span> pause · <span class="kbd">M</span> music · <span class="kbd">N</span> sfx · <span class="kbd">F</span> effects';
+  const assist = settings.aim === 'assist';
+  hudEls.hint.querySelector('.a').textContent = input.touchMode
+    ? (assist ? 'DRAG TO MOVE · AUTO-AIM ON · DASH BUTTON' : 'LEFT THUMB MOVES · RIGHT THUMB AIMS & FIRES · DASH BUTTON')
+    : (assist ? 'WASD MOVE · AUTO-AIM ON · SHIFT / SPACE DASH' : 'WASD MOVE · HOLD MOUSE TO FIRE (OR ARROWS) · SHIFT / SPACE / RIGHT-CLICK DASH');
+  $('pauseHint').style.display = input.touchMode ? 'none' : ''; $('overKeys').style.display = input.touchMode ? 'none' : '';
+  $('aimMode').innerHTML = settings.aim === 'assist' ? 'AIM: <b>ASSIST</b> · auto-aims for you' : 'AIM: <b>MANUAL</b> · you aim and fire';
 }
 function showScreen(s) {
   $('title').classList.toggle('hidden', s !== 'title'); $('legend').classList.toggle('hidden', s !== 'title'); $('controls').classList.toggle('hidden', s !== 'title');
@@ -1320,8 +1355,10 @@ function updatePopups(dt) {
     p.el.style.transform = `translate(${(tmpV.x * 0.5 + 0.5) * innerWidth}px, ${(-tmpV.y * 0.5 + 0.5) * innerHeight}px) translate(-50%, -50%) scale(${sc})`; p.el.style.opacity = a; }
 }
 function updateStick() {
-  const s = input.stick, el = $('stick'), on = s.active && G.state === 'playing'; el.classList.toggle('hidden', !on); if (!on) return;
-  el.children[0].style.left = s.ox + 'px'; el.children[0].style.top = s.oy + 'px'; el.children[1].style.left = s.x + 'px'; el.children[1].style.top = s.y + 'px';
+  for (const [s, id] of [[input.stick, 'stick'], [input.aim, 'aimStick']]) {
+    const el = $(id), on = s.active && G.state === 'playing'; el.classList.toggle('hidden', !on); if (!on) continue;
+    el.children[0].style.left = s.ox + 'px'; el.children[0].style.top = s.oy + 'px'; el.children[1].style.left = s.x + 'px'; el.children[1].style.top = s.y + 'px';
+  }
 }
 
 // =====================================================================
@@ -1332,7 +1369,9 @@ function confine(o, r) { const R = CONFIG.arenaR - r - 0.2, d = Math.hypot(o.x, 
 
 function updatePlayer(dt) {
   const k = input.keys; let mx = 0, mz = 0;
-  if (k.KeyA || k.ArrowLeft) mx -= 1; if (k.KeyD || k.ArrowRight) mx += 1; if (k.KeyW || k.ArrowUp) mz -= 1; if (k.KeyS || k.ArrowDown) mz += 1;
+  const assist = settings.aim === 'assist', arrowsMove = assist;
+  if (k.KeyA || (arrowsMove && k.ArrowLeft)) mx -= 1; if (k.KeyD || (arrowsMove && k.ArrowRight)) mx += 1;
+  if (k.KeyW || (arrowsMove && k.ArrowUp)) mz -= 1; if (k.KeyS || (arrowsMove && k.ArrowDown)) mz += 1;
   const s = input.stick;
   if (s.active) { const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy); if (d > 6) { const m = Math.min(1, d / 55); mx = dx / d * m; mz = dy / d * m; } }
   const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
@@ -1350,18 +1389,27 @@ function updatePlayer(dt) {
   if (player.dashCd > 0) player.dashCd -= dt;
   player.x += player.vx * dt; player.z += player.vz * dt; confine(player, CONFIG.playerRadius);
   // aim
-  let target = null, tx = 0, tz = 0;
-  if (G.autoAim) { target = nearestEnemy(player.x, player.z); if (target) { tx = target.x; tz = target.z; } }
-  else { screenToWorld(input.sx, input.sy); tx = input.mx; tz = input.mz; target = true; }
+  let aimAng = null, firing = false;
+  if (assist) { // accessibility: aims at the nearest enemy and fires on its own
+    if (G.autoAim || input.touchMode) { const t = nearestEnemy(player.x, player.z); if (t) { aimAng = Math.atan2(t.z - player.z, t.x - player.x); firing = true; } }
+    else { screenToWorld(input.sx, input.sy); aimAng = Math.atan2(input.mz - player.z, input.mx - player.x); firing = true; }
+  } else if (input.touchMode) { // right thumb: aim stick, fires while held
+    const a2 = input.aim; if (a2.active) { const dx = a2.x - a2.ox, dy = a2.y - a2.oy; if (Math.hypot(dx, dy) > 10) { aimAng = Math.atan2(dy, dx); firing = true; } }
+  } else { // arrows fire in that direction; otherwise hold the mouse button to fire at the cursor
+    const ax = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0), az = (k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0);
+    if (ax || az) { aimAng = Math.atan2(az, ax); firing = true; }
+    else { screenToWorld(input.sx, input.sy); aimAng = Math.atan2(input.mz - player.z, input.mx - player.x); firing = input.mouseDown; }
+  }
   const turn = (want, rate) => { const da = ((want - player.ang + Math.PI * 3) % TAU) - Math.PI; player.ang += da * Math.min(1, dt * rate); return da; };
-  if (target) turn(Math.atan2(tz - player.z, tx - player.x), 22); else if (ml > 0.1) turn(Math.atan2(mz, mx), 10);
+  if (aimAng != null) turn(aimAng, 24); else if (ml > 0.1) turn(Math.atan2(mz, mx), 10);
   // bank into lateral motion
   const fx = Math.cos(player.ang), fz = Math.sin(player.ang), lat = (player.vx * -fz + player.vz * fx) / CONFIG.playerSpeed;
   player.bank = lerp(player.bank, -lat * 1.0, Math.min(1, dt * 8));
   // fire
   const over = G.powerT.overdrive > 0, rate = CONFIG.fireRate * (over ? 2 : 1) * (1 + 0.2 * mod('rapid')) * Math.pow(0.9, mod('twin'));
   player.fireCd -= dt;
-  if (target && player.fireCd <= 0) {
+  if (player.fireCd < 0 && !firing) player.fireCd = 0;
+  if (firing && player.fireCd <= 0) {
     player.fireCd += 1 / rate; if (player.fireCd < 0) player.fireCd = 0;
     const angs = G.powerT.spread > 0 ? [-0.26, -0.13, 0, 0.13, 0.26] : [0], c = over ? HEX.spark : G.powerT.spread > 0 ? HEX.mint : '#7ff8ff', bc = hdrC(c, 3.2);
     const lanes = [[0], [-0.32, 0.32], [-0.5, 0, 0.5]][mod('twin')], lance = mod('lance') > 0, pierce = mod('pierce') + (lance ? 2 : 0);
@@ -1502,7 +1550,8 @@ function syncScene(dt) {
   shieldMesh.visible = G.powerT.shield > 0 && playing && !(G.powerT.shield < 3 && Math.floor(G.powerT.shield * 8) % 2);
   shieldMesh.rotation.set(time * 0.7, time * 1.1, 0);
   headingObj.visible = pv && !player.dead; headingObj.position.set(player.x, 0, player.z); headingObj.rotation.y = playerObj.rotation.y;
-  reticle.visible = playing && !G.autoAim && !player.dead; reticle.position.set(input.mx, 0.07, input.mz); reticle.rotation.y = time;
+  reticle.visible = playing && !input.touchMode && !(settings.aim === 'assist' && G.autoAim) && !player.dead;
+  reticle.material.color.copy(input.mouseDown || settings.aim === 'assist' ? hdrC(HEX.player, 2.2) : hdrC(HEX.player, 0.8)); reticle.position.set(input.mx, 0.07, input.mz); reticle.rotation.y = time;
   updateTrail(player.x, player.z, py, player.ang, pv && !player.dead);
 
   // enemies
