@@ -4,7 +4,7 @@ Run headless:  uv run --python 3.11 --with bpy==4.2.0 python tools/build_assets.
 
 Every object uses two materials: "Body" (dark metal, tinted per entity at runtime)
 and "Glow" (emissive trim, coloured per entity at runtime). Object names are the
-contract with the game: Player, Drifter, Chaser, Splitter, Dasher.
+contract with the game: Player, Drifter, Chaser, Splitter, Dasher, Warden (+WardenRing), Quiet (+QuietRing).
 """
 import math
 import os
@@ -109,50 +109,55 @@ def finish(ob, bevel=0.025, segments=1):
 
 
 # --------------------------------------------------------------------- player
+def ring_verts(bm, r, z, n=12, off=0.0):
+    return [bm.verts.new((math.cos(off + i * 2 * math.pi / n) * r, math.sin(off + i * 2 * math.pi / n) * r, z)) for i in range(n)]
+
+
+def band(bm, a, b, mat):
+    faces = []
+    for i in range(len(a)):
+        f = bm.faces.new((a[i], a[(i + 1) % len(a)], b[(i + 1) % len(b)], b[i]))
+        f.material_index = mat
+        faces.append(f)
+    return faces
+
+
 def build_player(body, glow, glass):
+    """A lens-shaped star shard with a forward beam blade: round, so it never reads as a Dasher arrowhead."""
     bm = bmesh.new()
-    # fuselage: nose at +Y
-    loft(bm, [(1.25, 0.02, 0.02, 0.02), (0.75, 0.16, 0.12, 0.03), (0.15, 0.27, 0.19, 0.05),
-              (-0.45, 0.30, 0.2, 0.03), (-0.85, 0.22, 0.15, 0.0)], mat=0)
-    # swept wings (mirrored)
+    n = 12
+    top, eq, bot = ring_verts(bm, 0.28, 0.14, n), ring_verts(bm, 0.62, 0.0, n), ring_verts(bm, 0.28, -0.14, n)
+    upper = band(bm, top, eq, 0)
+    band(bm, eq, bot, 0)
+    bm.faces.new(top).material_index = 0
+    bm.faces.new(list(reversed(bot))).material_index = 0
+    seams(bm, upper, frame=0.05, seam=0.025, depth=0.03)
+    # equator light band
+    bmesh.ops.create_cone(bm, cap_ends=False, segments=n, radius1=0.655, radius2=0.655, depth=0.05)
+    for f in bm.faces:
+        if f.material_index == 0 and all(abs(math.hypot(v.co.x, v.co.y) - 0.655) < 1e-3 for v in f.verts):
+            f.material_index = 1
+    # beam blades (rolled 12 deg, a nod to the pulsar's tilted axis)
+    roll = Matrix.Rotation(math.radians(12), 4, "Y")
+    for pts, glo, z in (([(-0.16, 0.5), (0.16, 0.5), (0.02, 1.35), (-0.02, 1.35)], [(-0.04, 0.55), (0.04, 0.55), (0.01, 1.3), (-0.01, 1.3)], 0.05),
+                        ([(0.12, -0.5), (-0.12, -0.5), (-0.03, -0.95), (0.03, -0.95)], [(0.04, -0.52), (-0.04, -0.52), (-0.01, -0.9), (0.01, -0.9)], 0.045)):
+        fs = prism(bm, pts, -z, z, mat=0) + prism(bm, glo, z, z + 0.04, mat=1)
+        verts = {v for f in fs for v in f.verts}
+        bmesh.ops.transform(bm, matrix=roll, verts=list(verts))
+    # twin engine pods
     for s in (1, -1):
-        wing = [(0.18 * s, 0.35), (1.05 * s, -0.55), (1.0 * s, -0.78), (0.25 * s, -0.62)]
-        if s < 0:
-            wing.reverse()
-        prism(bm, wing, -0.035, 0.035, mat=0)
-        # glowing leading-edge strip
-        strip = [(0.2 * s, 0.39), (1.09 * s, -0.53), (1.06 * s, -0.47), (0.24 * s, 0.3)]
-        if s < 0:
-            strip.reverse()
-        prism(bm, strip, -0.02, 0.05, mat=1)
-        # wingtip fin
-        fin = [(0.98 * s, -0.5), (1.0 * s, -0.8), (1.02 * s, -0.8)]
-        if s < 0:
-            fin.reverse()
-        bmesh.ops.create_cone(bm, cap_ends=True, segments=4, radius1=0.05, radius2=0.0, depth=0.32,
-                              matrix=Matrix.Translation((1.0 * s, -0.62, 0.15)))
-        # engine pod + emissive exhaust
-        pod = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.11, radius2=0.13, depth=0.55,
-                                    matrix=Matrix.Translation((0.38 * s, -0.62, -0.02)) @ Matrix.Rotation(math.pi / 2, 4, "X"))
-        ex = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.085, radius2=0.085, depth=0.06,
-                                   matrix=Matrix.Translation((0.38 * s, -0.92, -0.02)) @ Matrix.Rotation(math.pi / 2, 4, "X"))
+        ex = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.08, radius2=0.08, depth=0.22,
+                                   matrix=Matrix.Translation((0.34 * s, -0.48, 0.0)) @ Matrix.Rotation(math.pi / 2, 4, "X"))
         for v in ex["verts"]:
             for f in v.link_faces:
                 f.material_index = 1
-    # central exhaust
-    ex = bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=0.15, radius2=0.12, depth=0.08,
-                               matrix=Matrix.Translation((0, -0.88, 0.0)) @ Matrix.Rotation(math.pi / 2, 4, "X"))
-    for v in ex["verts"]:
-        for f in v.link_faces:
-            f.material_index = 1
-    # cockpit canopy
-    can = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0,
-                                     matrix=Matrix.Translation((0, 0.22, 0.17)) @ Matrix.Diagonal((0.13, 0.38, 0.09, 1)))
-    for v in can["verts"]:
+    core = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0,
+                                      matrix=Matrix.Translation((0, 0, 0.12)) @ Matrix.Diagonal((0.24, 0.24, 0.17, 1)))
+    for v in core["verts"]:
         for f in v.link_faces:
             f.material_index = 2
     ob = mesh_obj("Player", bm, [body, glow, glass])
-    return finish(ob, bevel=0.012)
+    return finish(ob, bevel=0.01)
 
 
 # -------------------------------------------------------------------- drifter
@@ -178,20 +183,22 @@ def build_drifter(body, glow):
 
 # --------------------------------------------------------------------- chaser
 def build_chaser(body, glow):
+    """A spiked icosahedral hunter: organic, aggressive, nothing like a crate."""
     bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=1.3)
+    bmesh.ops.create_icosphere(bm, subdivisions=0, radius=0.72)
     faces = list(bm.faces)
-    seams(bm, faces, frame=0.12, seam=0.045, depth=0.09)
-    # spikes on the 8 corners
-    for x in (-1, 1):
-        for y in (-1, 1):
-            for z in (-1, 1):
-                d = Vector((x, y, z)).normalized()
-                rot = d.to_track_quat("Z", "Y").to_matrix().to_4x4()
-                sp = bmesh.ops.create_cone(bm, cap_ends=True, segments=3, radius1=0.12, radius2=0.0, depth=0.4,
-                                           matrix=Matrix.Translation(d * 1.1) @ rot)
+    centers = [(f.calc_center_median().copy(), f.normal.copy()) for f in faces]
+    seams(bm, faces, frame=0.05, seam=0.03, depth=0.06)
+    for i, (c, nrm) in enumerate(centers):
+        if i % 5 in (0, 2):  # 8 of the 20 faces carry a spike
+            rot = nrm.to_track_quat("Z", "Y").to_matrix().to_4x4()
+            sp = bmesh.ops.create_cone(bm, cap_ends=True, segments=3, radius1=0.13, radius2=0.0, depth=0.5,
+                                       matrix=Matrix.Translation(c + nrm * 0.22) @ rot)
+            tip = max(sp["verts"], key=lambda v: (v.co - c).length)
+            for f in tip.link_faces:
+                f.material_index = 1
     ob = mesh_obj("Chaser", bm, [body, glow])
-    return finish(ob, bevel=0.03)
+    return finish(ob, bevel=0.02)
 
 
 # ------------------------------------------------------------------- splitter
@@ -216,27 +223,83 @@ def build_splitter(body, glow):
 
 # --------------------------------------------------------------------- dasher
 def build_dasher(body, glow):
+    """A split chevron: two blades around a burning slot, tail of diamonds behind."""
     bm = bmesh.new()
-    # arrowhead hull, nose at +Y
-    loft(bm, [(1.2, 0.02, 0.02, 0.0), (0.4, 0.42, 0.18, 0.02), (-0.5, 0.75, 0.16, 0.0), (-0.75, 0.5, 0.12, 0.0)], mat=0)
-    for s in (1, -1):
-        blade = [(0.3 * s, 0.4), (1.0 * s, -0.95), (0.6 * s, -0.7)]
-        if s < 0:
-            blade.reverse()
-        prism(bm, blade, -0.05, 0.05, mat=0)
-        trim = [(0.32 * s, 0.45), (1.06 * s, -1.0), (0.98 * s, -0.88), (0.3 * s, 0.32)]
-        if s < 0:
-            trim.reverse()
-        prism(bm, trim, -0.03, 0.07, mat=1)
-    # dorsal spine glow
-    prism(bm, [(-0.04, 1.05), (0.04, 1.05), (0.06, -0.6), (-0.06, -0.6)], 0.12, 0.24, mat=1)
-    ex = bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=0.2, radius2=0.14, depth=0.1,
-                               matrix=Matrix.Translation((0, -0.8, 0.0)) @ Matrix.Rotation(math.pi / 2, 4, "X"))
-    for v in ex["verts"]:
-        for f in v.link_faces:
-            f.material_index = 1
+    for sgn in (1, -1):
+        blade = [(0.06 * sgn, 1.0), (0.75 * sgn, -0.7), (0.5 * sgn, -0.85), (0.06 * sgn, 0.2)]
+        trim = [(0.75 * sgn, -0.7), (0.06 * sgn, 1.0), (0.1 * sgn, 1.05), (0.82 * sgn, -0.68)]
+        inner = [(0.06 * sgn, 0.2), (0.06 * sgn, 1.0), (0.03 * sgn, 0.98), (0.03 * sgn, 0.24)]
+        for pts in (blade, trim, inner):
+            if sgn < 0:
+                pts.reverse()
+        prism(bm, blade, -0.09, 0.09, mat=0)
+        prism(bm, trim, -0.06, 0.11, mat=1)
+        prism(bm, inner, -0.07, 0.07, mat=1)
+    for k, (y, r) in enumerate(((-0.95, 0.14), (-1.25, 0.11), (-1.5, 0.08))):
+        d = [(0, y + r), (r * 0.7, y), (0, y - r), (-r * 0.7, y)]
+        prism(bm, d, -0.04, 0.04, mat=1)
     ob = mesh_obj("Dasher", bm, [body, glow])
-    return finish(ob, bevel=0.015)
+    return finish(ob, bevel=0.012)
+
+
+# --------------------------------------------------------------------- bosses
+def build_warden(body, glow, glass):
+    """The Warden: a seamed core with a glass eye, and a segmented ring that spins at runtime."""
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=2, radius=0.6)
+    faces = list(bm.faces)
+    seams(bm, faces[::2], frame=0.03, seam=0.018, depth=0.035)
+    eye = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0,
+                                     matrix=Matrix.Translation((0, 0, 0.42)) @ Matrix.Diagonal((0.27, 0.27, 0.2, 1)))
+    for v in eye["verts"]:
+        for f in v.link_faces:
+            f.material_index = 2
+    ob = mesh_obj("Warden", bm, [body, glow, glass])
+    finish(ob, bevel=0.01)
+    rb = bmesh.new()
+    seg, gap = 6, math.radians(8)
+    for k in range(seg):
+        a0, a1 = k * 2 * math.pi / seg + gap / 2, (k + 1) * 2 * math.pi / seg - gap / 2
+        steps = 6
+        arc = [(math.cos(a0 + (a1 - a0) * i / steps), math.sin(a0 + (a1 - a0) * i / steps)) for i in range(steps + 1)]
+        pts = [(c * 0.84, s_ * 0.84) for c, s_ in arc] + [(c * 1.0, s_ * 1.0) for c, s_ in reversed(arc)]
+        prism(rb, pts, -0.08, 0.08, mat=0)
+        strip = [(c * 1.0, s_ * 1.0) for c, s_ in arc] + [(c * 1.04, s_ * 1.04) for c, s_ in reversed(arc)]
+        prism(rb, strip, -0.05, 0.05, mat=1)
+    for k in range(4):
+        a = k * math.pi / 2 + math.pi / 4
+        rot = Vector((math.cos(a), math.sin(a), 0)).to_track_quat("Z", "Y").to_matrix().to_4x4()
+        em = bmesh.ops.create_cone(rb, cap_ends=True, segments=6, radius1=0.09, radius2=0.0, depth=0.28,
+                                   matrix=Matrix.Translation((math.cos(a) * 1.14, math.sin(a) * 1.14, 0)) @ rot)
+        for v in em["verts"]:
+            for f in v.link_faces:
+                f.material_index = 1
+    ring = mesh_obj("WardenRing", rb, [body, glow, glass])
+    finish(ring, bevel=0.008)
+    ring.parent = ob
+    return ob
+
+
+def build_quiet(body, glow):
+    """The Quiet: a pulsar-shaped hole. A matte black sphere, a hairline halo, two dead beam stubs."""
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=3, radius=0.8)
+    for s_ in (1, -1):
+        st = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.12, radius2=0.0, depth=0.6,
+                                   matrix=Matrix.Translation((0, 0, 0.95 * s_)) @ Matrix.Rotation(0 if s_ > 0 else math.pi, 4, "X"))
+        for v in st["verts"]:
+            for f in v.link_faces:
+                f.material_index = 1
+    ob = mesh_obj("Quiet", bm, [body, glow])
+    finish(ob, bevel=0)
+    for p in ob.data.polygons:
+        p.use_smooth = True
+    bpy.ops.mesh.primitive_torus_add(major_radius=1.2, minor_radius=0.02, major_segments=64, minor_segments=6)
+    t = bpy.context.active_object
+    t.name = "QuietRing"
+    t.data.materials.append(glow)
+    t.parent = ob
+    return ob
 
 
 def build_all():
@@ -245,7 +308,7 @@ def build_all():
     glow = material("Glow", (1, 1, 1), emit=4.0)
     glass = material("Glass", (0.2, 0.9, 1.0), emit=0.6, metal=0.2, rough=0.08)
     objs = [build_player(body, glow, glass), build_drifter(body, glow), build_chaser(body, glow),
-            build_splitter(body, glow), build_dasher(body, glow)]
+            build_splitter(body, glow), build_dasher(body, glow), build_warden(body, glow, glass), build_quiet(body, glow)]
     for i, ob in enumerate(objs):
         ob.location = (0, 0, 0)
     return objs
@@ -274,7 +337,7 @@ def preview(objs, outdir):
     world.node_tree.nodes["Background"].inputs[0].default_value = (0.01, 0.004, 0.03, 1)
     sc.world = world
     tint = {"Player": (0, 0.94, 1), "Drifter": (0.69, 0.3, 1), "Chaser": (1, 0.18, 0.53),
-            "Splitter": (0.49, 1, 0.31), "Dasher": (1, 0.69, 0)}
+            "Splitter": (0.49, 1, 0.31), "Dasher": (1, 0.54, 0), "Warden": (1, 0.18, 0.53), "Quiet": (1, 1, 1)}
     bpy.ops.object.light_add(type="AREA", location=(2.5, -2.5, 4))
     key = bpy.context.active_object
     key.data.energy = 300

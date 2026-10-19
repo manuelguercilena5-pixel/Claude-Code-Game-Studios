@@ -232,6 +232,16 @@
   @media (max-width: 760px) { #bossWrap { top: calc(150px + var(--st)); } #stats { grid-template-columns: repeat(5, minmax(54px, 1fr)); } #lives { top: calc(70px + var(--st)); right: calc(20px + var(--sr)); } }
   #err { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--fg); font: 600 18px var(--b); padding: 24px; text-align: center; }
 
+  /* ---------- ending ---------- */
+  #ending { background: radial-gradient(ellipse at center, rgba(232,240,255,.16), rgba(5,1,15,.92) 70%); pointer-events: auto; }
+  .endh { font: 400 clamp(30px, 8vw, 72px) var(--d); letter-spacing: .14em; margin: 14px 0 0; color: #fff; text-shadow: 0 0 14px #fff, 0 0 40px var(--cyan); padding-left: .14em; text-wrap: balance; }
+  .endp { font: 500 italic 20px var(--b); color: var(--dim); margin: 8px 0 0; }
+  #endStats { display: grid; grid-template-columns: repeat(4, minmax(70px, 120px)); gap: 6px; margin-top: 22px; }
+  #endStats small { display: block; font: 600 12px var(--u); letter-spacing: .2em; color: var(--dim); } #endStats b { font: 700 24px var(--n); }
+  #credits { display: flex; flex-direction: column; gap: 4px; margin-top: 22px; font: 500 14px var(--b); color: var(--dim); max-width: 560px; }
+  #credits b { font: 400 16px var(--d); letter-spacing: .3em; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+  @media (max-height: 640px) { .endh { font-size: clamp(26px, 6vw, 44px); margin-top: 6px; } #endStats { margin-top: 10px; } #credits { margin-top: 10px; font-size: 13px; } #credits span:nth-child(3) { display: none; } }
+
   /* ---------- reduced motion (OS setting or calm effects) ---------- */
   @media (prefers-reduced-motion: reduce) { .ov.in > *, .card, .bn, #wipe.go, .logo .ltr, .logo .beam { animation-duration: .12s !important; animation-delay: 0s !important; }
     .logo .dot, #play, .mbtn.pri, .card .pips i.nx { animation: none !important; } .logo .ltr { stroke-dashoffset: 0; } .logo .beam { transform: none; } }
@@ -304,6 +314,14 @@
   <div class="menu col"><button class="mbtn pri" id="retryBtn">RETRY</button><div class="row"><button class="sbtn" id="shareBtn">COPY RESULT</button><button class="mbtn dim" id="overMenuBtn">MAIN MENU</button></div></div>
   <div class="keys" id="overKeys">R · retry &nbsp; T · menu</div>
 </div>
+<div id="ending" class="layer ov hidden">
+  <div class="go">WHITE CORE · CLEARED</div>
+  <h2 class="endh">THE BEAT HOLDS</h2>
+  <p class="endp">Keep it.</p>
+  <div id="endStats"></div>
+  <div id="credits"><b>PULSAR 3D</b><span>a game made with Claude Code Game Studios</span><span>creative direction · game design · narrative · art direction · technical art · audio direction · UX · QA</span><span>by a studio of coordinated agents · directed by you</span></div>
+  <div class="menu col"><button class="mbtn pri" id="afterBtn">ENTER AFTERGLOW</button><div class="row"><button class="mbtn dim" id="endMenuBtn">MAIN MENU</button></div></div>
+</div>
 <div id="draft" class="layer ov hidden"><h3>CHOOSE AN UPGRADE</h3><p id="draftSub">pick one · keys 1 2 3</p><div id="cards"></div></div>
 <div id="pause" class="layer ov hidden"><h2>PAUSED</h2>
   <div class="menu col"><button class="mbtn pri" id="resumeBtn">RESUME</button><div class="row"><button class="mbtn alt" id="restartBtn">RESTART</button><button class="mbtn dim" id="pauseMenuBtn">MAIN MENU</button></div></div>
@@ -363,11 +381,18 @@ const ENEMY = {
   mini:     { r: 0.6,  speed: 11,   hp: 1, score: 25,  color: '#7CFF4F', model: 'Splitter' },
   dasher:   { r: 1.05, speed: 3.0,  hp: 2, score: 200, color: '#FF8A00', model: 'Dasher',
               dashSpeed: 32, dashDist: 25, aimTime: 0.6, restTime: 1.2 },
-  boss:     { r: 3.0,  speed: 2.2,  hp: 160, score: 5000, color: '#FF2E88', model: 'Drifter' },
+  boss:     { r: 3.0,  speed: 2.2,  hp: 160, score: 5000, color: '#FF2E88', model: 'Warden', boss: 'THE WARDEN' },
+  echo:     { r: 1.9,  speed: 0,    hp: 210, score: 8000, color: '#FF2E88', model: 'Player', boss: 'THE ECHO' },
+  quiet:    { r: 3.2,  speed: 0,    hp: 180, score: 20000, color: '#FFFFFF', model: 'Quiet', boss: 'THE QUIET', tint: 0 },
+  node:     { r: 0.9,  speed: 0,    hp: 14,  score: 500, color: '#00F0FF', model: 'Drifter' },
 };
+// sector boss roster: the Warden keeps the doors, the Echo learns you, the Quiet ends it
+const BOSS_OF = n => ['boss', 'boss', 'echo', 'boss', 'quiet'][n % 5];
 const QUIPS = { 'a Drifter': 'Static that learned to float. Mostly harmless. Mostly.', 'a Chaser': 'It caught up. They usually do.', 'a Splitter': 'Outnumbered by one enemy. Impressive.',
-  'a Splitter shard': 'Hit it once, meet the family.', 'a Dasher': 'You saw it coming. So did it.', 'the Warden': 'The door stays shut. For now.', 'a Warden orb': 'The door stays shut. For now.' };
-const KILLER = { drifter: 'a Drifter', chaser: 'a Chaser', splitter: 'a Splitter', mini: 'a Splitter shard', dasher: 'a Dasher', boss: 'the Warden' };
+  'a Splitter shard': 'Hit it once, meet the family.', 'a Dasher': 'You saw it coming. So did it.', 'the Warden': 'The door stays shut. For now.', 'a Warden orb': 'The door stays shut. For now.',
+  'the Echo': 'Beaten by your own bad habits.', 'the Quiet': 'Silence wins this round.', 'a Pulse Node': 'Silence wins this round.' };
+const KILLER = { drifter: 'a Drifter', chaser: 'a Chaser', splitter: 'a Splitter', mini: 'a Splitter shard', dasher: 'a Dasher', boss: 'the Warden', echo: 'the Echo', quiet: 'the Quiet', node: 'a Pulse Node' };
+const ORB_OF = { boss: 'a Warden orb', echo: 'the Echo', quiet: 'the Quiet' };
 // Five sectors, each closed by the Warden. After sector 5 the loop restarts 15% faster.
 const SECTORS = [
   { name: 'NEON GATE',     tint: '#7A3CFF', mix: { drifter: 1, chaser: 0.6 },                              rate: [1.0, 1.8], speed: 1.0 },
@@ -416,6 +441,7 @@ const store = {
 const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
 const settings = Object.assign({ music: true, sfx: true, fx: reduceMotion ? 'calm' : 'full', aim: 'manual' }, store.get('pulsar3d_settings', {}));
 if (settings.aim !== 'assist') settings.aim = 'manual'; // manual (twin-stick) is the real game; assist is an accessibility option
+let meta = Object.assign({ cleared: 0 }, store.get('pulsar3d_meta', {}));
 let best = Object.assign({ score: 0, mult: 1, chain: 0, time: 0 }, store.get('pulsar3d_best', {}));
 let dailyBest = Object.assign({ day: '', score: 0, attempts: 0 }, store.get('pulsar3d_daily', {}));
 let streak = Object.assign({ last: '', n: 0 }, store.get('pulsar3d_streak', {}));
@@ -627,8 +653,8 @@ const Sound = {
     this.sfxIn.gain.setTargetAtTime(s, t, 0.03); this.subIn.gain.setTargetAtTime(s, t, 0.03); this.musicGain.gain.setTargetAtTime(settings.music ? 0.62 : 0, t, 0.05); },
 
   // ---------- music transport ----------
-  wantSet() { return this.musicMode === 'game' ? (this.boss ? 'boss' : 'game') : this.musicMode === 'title' ? 'title' : null; },
-  layerOn(name, i) { return name !== 'game' || i <= this.level; },
+  wantSet() { return this.musicMode === 'game' ? (this.boss && !this.quiet ? 'boss' : 'game') : this.musicMode === 'title' ? 'title' : null; },
+  layerOn(name, i) { return name !== 'game' || (this.quiet ? i < this.qLayers : i <= this.level); },
   playSet(name, at, fade = 0.03) {
     if (!this.ready) return; const st = this.stems[name]; if (!st) return; // starts by itself once rendered
     const c = this.ctx, t = Math.max(at || 0, c.currentTime + 0.03); this.stopSet(t, fade);
@@ -648,16 +674,20 @@ const Sound = {
   setMode(mode, instant) {
     const prev = this.musicMode; this.musicMode = mode; if (!this.ready) return; this.token++;
     if (mode === 'title') { if (!this.cur || this.cur.name !== 'title') this.playSet('title', 0, prev === 'over' ? 2.5 : 0.8); }
-    else if (mode === 'game') { this.boss = false; this.level = 0; this.playSet('game', 0, instant ? 0.03 : 0.15); }
+    else if (mode === 'game') { this.boss = false; this.quiet = false; this.level = 0; this.playSet('game', 0, instant ? 0.03 : 0.15); }
     else if (mode === 'over') { // tape-stop, then the title drone drifts back in
       const t = this.now, cur = this.cur; if (cur) { cur.srcs.forEach(s => { s.playbackRate.setValueAtTime(1, t); s.playbackRate.linearRampToValueAtTime(0.22, t + 1.3); });
         const f = this.mLP.frequency; f.cancelScheduledValues(t); f.setValueAtTime(Math.min(20000, f.value), t); f.exponentialRampToValueAtTime(260, t + 1.3); this.stopSet(t + 1.0, 0.4); }
       const tok = this.token; setTimeout(() => { if (this.token === tok && this.musicMode === 'over') { this.restoreMusicBus(); this.playSet('title', 0, 3); } }, 2200); }
   },
-  setLevel(lvl, boss) {
+  setLevel(lvl, kind) {
     this.level = lvl; if (!this.ready || this.musicMode !== 'game') return;
-    if (boss && !this.boss) { this.boss = true; const t = this.nextGrid(0.25); this.playSet('boss', t, 0.02); this.stinger(t, true); return; }
-    if (!boss && this.boss) { this.boss = false; this.bossFall(); return; }
+    if (kind === 'quiet' && !this.quiet) { // the Quiet eats the score: the game set keeps running silently, each node you break brings a layer back
+      this.boss = true; this.quiet = true; this.qLayers = 0; const t = this.now; this.stopSet(t, 0.6); this.playSet('game', t + 2.2, 0.03);
+      this.K.noise(this.rvIn, t, { f: 3000, f1: 120, sweep: 2, d: 2.2, peak: 0.4 }); return; }
+    if (kind && kind !== 'quiet' && !this.boss) { this.boss = true; const t = this.nextGrid(0.25); this.playSet('boss', t, 0.02); this.stinger(t, true); return; }
+    if (!kind && this.boss) { this.boss = false; this.quiet = false; this.bossFall(); return; }
+    if (this.quiet) return;
     const c = this.cur; if (!c || c.name !== 'game') return; const t = this.now, beat = 60 / c.bpm;
     c.gains.forEach((g, i) => { const on = this.layerOn('game', i); g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t);
       g.gain.setTargetAtTime(on ? 1 : 0.0001, t, on ? beat / 3 : beat * 8 / 3); }); // in over a beat, out over two bars
@@ -669,6 +699,9 @@ const Sound = {
     K.tone(this.subIn, t + 0.35, { f: MIDI(45), a: 0.4, hold: 1, d: 2, peak: 0.25 });
     setTimeout(() => { if (this.token === tok && this.musicMode === 'game' && !this.boss) this.playSet('game', 0, 0.6); }, 1800);
   },
+  quietLayer(n) { this.qLayers = n; const c = this.cur; if (!c || !this.quiet) return; const t = this.now;
+    c.gains.forEach((g, i) => { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.setTargetAtTime(i < n ? 1 : 0.0001, t, i < n ? 0.08 : 0.6); });
+    if (n) this.stinger(this.nextGrid(1), false); },
   stinger(t, boss) { if (!this.ok(true)) return; const K = this.K, ch = boss ? MUSIC.boss.prog[0] : this.chord(t), g = K.gain(1, this.sfxIn); g.connect(this.rvIn);
     K.noise(g, t - 0.9, { ft: 'bandpass', f: 400, f1: 6000, sweep: 0.9, q: 1.2, d: 0.9, peak: 0.25, swell: true });
     ch.slice(0, 3).forEach(m => K.saws(g, t, { n: 5, f: MIDI(m), spread: 22, a: 0.005, d: 1.4, peak: 0.08 }));
@@ -1044,12 +1077,13 @@ function fallbackModels() {
   m.Player = mk(new THREE.ConeGeometry(0.7, 2, 3).rotateX(-Math.PI / 2));
   m.Drifter = mk(new THREE.OctahedronGeometry(0.8)); m.Chaser = mk(new THREE.BoxGeometry(1.2, 1.2, 1.2));
   m.Splitter = mk(new THREE.TetrahedronGeometry(1)); m.Dasher = mk(new THREE.ConeGeometry(0.8, 2, 3).rotateX(-Math.PI / 2));
+  m.Warden = mk(new THREE.IcosahedronGeometry(0.7, 1)); m.Quiet = mk(new THREE.SphereGeometry(0.8, 24, 16));
   Object.values(m).forEach(g => g.traverse(o => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ name: 'Glow' }); }));
   return m;
 }
 function buildTemplates(models) {
   TEMPL.player = prepTemplate(models.Player, HEX.player, 0.32, 3.6);
-  for (const t of Object.keys(ENEMY)) TEMPL[t] = prepTemplate(models[ENEMY[t].model], ENEMY[t].color);
+  for (const t of Object.keys(ENEMY)) TEMPL[t] = prepTemplate(models[ENEMY[t].model] || models.Drifter, ENEMY[t].color, ENEMY[t].tint);
 }
 
 // ---------- pools ----------
@@ -1069,7 +1103,7 @@ function makeEnemyObject(type) {
       fragmentShader: `uniform float uT, uA; varying vec2 vUv; void main(){ float dash = step(0.45, fract(vUv.y * 14.0 + uT * 3.0)); float side = smoothstep(0.5, 0.2, abs(vUv.x - 0.5));
         gl_FragColor = vec4(vec3(2.6, 0.9, 0.0) * dash * side * uA * (0.5 + 0.5 * vUv.y), 1.0); }` }));
     aim.scale.set(1.0, 1, d.dashDist); root.add(aim); }
-  const ringMesh = model.getObjectByName('DrifterRing');
+  const ringMesh = model.getObjectByName('DrifterRing') || model.getObjectByName('WardenRing') || model.getObjectByName('QuietRing');
   scene.add(root);
   return { root, model, shadow, beam, aim, glows, ringMesh, baseGlow: hdr(d.color, 2.6) };
 }
@@ -1241,7 +1275,7 @@ try { if (matchMedia('(pointer: coarse)').matches) input.touchMode = true; } cat
 function clearWorld() {
   for (const e of enemies) releaseEnemyObject(e.type, e.obj);
   enemies = []; bullets = []; sparks = []; eShots = []; for (const p of powerups) p.obj.visible = false; powerups = [];
-  P.n = 0; for (const d of D) d.on = false; trailPts.length = 0;
+  P.n = 0; for (const d of D) d.on = false; trailPts.length = 0; quietBeams(null);
 }
 function startGame(mode) {
   if (G.state === 'loading') return;
@@ -1284,7 +1318,7 @@ function spawnEnemy(type, x, z, warp = CONFIG.spawnWarp) {
   if (enemies.length >= CONFIG.maxEnemies) return null;
   const d = ENEMY[type], obj = getEnemyObject(type);
   const e = { id: G.uid++, type, x, z, vx: 0, vz: 0, r: d.r, hp: d.hp, warp, warpMax: warp || 1, ang: rand(0, TAU), wander: rand(0, TAU),
-    state: 'rest', timer: d.restTime ? rand(0.4, 1.4) : 0, dashLeft: 0, dir: 0, grazed: false, flash: 0, dead: false, obj, bob: rand(0, TAU) };
+    state: 'rest', timer: d.restTime ? rand(0.4, 1.4) : 0, dashLeft: 0, dir: 0, grazed: false, flash: 0, dead: false, obj, bob: rand(0, TAU), isBoss: !!d.boss };
   obj.beam.visible = warp > 0; if (obj.aim) obj.aim.material.uniforms.uA.value = 0;
   enemies.push(e);
   if (warp > 0) { shock(x, z, 0.08, d.r * 4, warp, d.color, 1.8); if (Math.random() < 0.5) Sound.spawn(type, x); }
@@ -1315,20 +1349,28 @@ function updateSpawning(dt) {
 function bossUI(on) { $('bossWrap').classList.toggle('hidden', !on); }
 function spawnBoss() {
   if (G.boss) return;
-  const pd = Math.hypot(player.x, player.z), bx = pd > 6 ? -player.x / pd * 8 : 0, bz = pd > 6 ? -player.z / pd * 8 : -12; // never on top of the player
-  const e = spawnEnemy('boss', bx, bz, 1.6); if (!e) return;
-  const loop = Math.floor(G.sectorN / SECTORS.length);
-  e.maxHp = e.hp = Math.round(CONFIG.bossHp * (1 + 0.35 * (G.sectorN % SECTORS.length)) * (1 + 0.25 * loop));
-  Object.assign(e, { phase: 1, timer: 2.4, atk: 0, ringOff: 0, spiral: 0, spT: 0, orbit: Math.atan2(bz, bx), charge: 0 });
+  const kind = BOSS_OF(G.sectorN), d = ENEMY[kind], loop = Math.floor(G.sectorN / SECTORS.length);
+  const pd = Math.hypot(player.x, player.z), bx = kind === 'quiet' ? 0 : pd > 6 ? -player.x / pd * 8 : 0, bz = kind === 'quiet' ? 0 : pd > 6 ? -player.z / pd * 8 : -12; // never on top of the player
+  if (kind === 'quiet' && pd < 9) { player.x = player.x / (pd || 1) * 12 || 12; player.z = player.z / (pd || 1) * 12; }
+  const e = spawnEnemy(kind, bx, bz, 1.6); if (!e) return;
+  e.maxHp = e.hp = Math.round(d.hp * (kind === 'boss' ? 1 + 0.35 * (G.sectorN % SECTORS.length) : 1) * (1 + 0.25 * loop));
+  Object.assign(e, { phase: 1, timer: 2.4, atk: 0, ringOff: 0, spiral: 0, spT: 0, orbit: Math.atan2(bz, bx), charge: 0, echoDash: 0, dashT: 0, nodes: [], mode: 'nodes', cycle: 0, expT: 0, beamT: 6, beamA: 0, beamDir: 1 });
   e.obj.beam.scale.set(4, 30, 4);
-  G.boss = e; $('bossName').textContent = 'THE WARDEN · SECTOR ' + (G.sectorN + 1); bossUI(true); setMusicLevel(); haptic([30, 60, 30], 0);
-  banner('WARNING', HEX.pink, 'THE WARDEN APPROACHES', 2.2); Sound.alarm(); Sound.duckMusic(6, 1.2);
+  const prime = kind === 'boss' && G.sectorN % 5 === 3;
+  G.boss = e; $('bossName').textContent = d.boss + (prime ? ' · PRIME' : '') + ' · SECTOR ' + (G.sectorN + 1); bossUI(true); setMusicLevel(); haptic([30, 60, 30], 0);
+  const sub = { boss: 'THE WARDEN APPROACHES', echo: 'IT HAS BEEN WATCHING YOU', quiet: 'make the rhythm yourself' }[kind];
+  banner(kind === 'quiet' ? 'THE QUIET' : 'WARNING', kind === 'quiet' ? '#FFFFFF' : HEX.pink, sub, 2.4, 'threat'); Sound.alarm(); Sound.duckMusic(6, 1.2);
+  if (kind === 'quiet') { for (let k = 0; k < 4; k++) quietNode(e, k); }
 }
+function bossPhase(e, ph, note) {
+  if (ph === e.phase) return; e.phase = ph; e.timer = 1.0; banner('PHASE ' + ph, HEX.pink, note, 1.0);
+  shock(e.x, e.z, 0.1, 14, 0.6, HEX.pink); ripple(e.x, e.z, 2.2); Sound.alarm();
+}
+function orb(x, z, vx, vz, life) { if (eShots.length < MAXE) eShots.push({ x, z, vx, vz, life, grazed: false }); }
 function shot(x, z, a, sp) { if (eShots.length >= MAXE) return; eShots.push({ x: x + Math.cos(a) * 3.1, z: z + Math.sin(a) * 3.1, vx: Math.cos(a) * sp, vz: Math.sin(a) * sp, life: 7, grazed: false }); }
 function updateBoss(e, dt) {
   const hpK = e.hp / e.maxHp, ph = hpK > 0.66 ? 1 : hpK > 0.33 ? 2 : 3, sp = 7.5 + (G.sectorN % SECTORS.length) * 0.6 + Math.floor(G.sectorN / SECTORS.length);
-  if (ph !== e.phase) { e.phase = ph; e.timer = 1.0; banner('PHASE ' + ph, HEX.pink, ph === 3 ? 'the Warden calls for help' : null, 1.0);
-    shock(e.x, e.z, 0.1, 14, 0.6, HEX.pink); ripple(e.x, e.z, 2.2); Sound.alarm(); }
+  bossPhase(e, ph, ph === 3 ? 'the Warden calls for help' : null);
   e.orbit += dt * 0.25; const tx = Math.cos(e.orbit) * 9, tz = Math.sin(e.orbit * 1.3) * 7;
   e.vx = lerp(e.vx, (tx - e.x) * 0.7, Math.min(1, dt * 2)); e.vz = lerp(e.vz, (tz - e.z) * 0.7, Math.min(1, dt * 2)); e.ang += dt * (0.5 + ph * 0.3);
   e.timer -= dt; e.charge = e.timer < 0.6 ? 1 - Math.max(0, e.timer) / 0.6 : 0; // 0.6 s glow telegraph before every attack
@@ -1343,7 +1385,7 @@ function updateBoss(e, dt) {
   if (e.spiral > 0) { e.spiral -= dt; e.spT -= dt; if (e.spT <= 0) { e.spT = 0.075; shot(e.x, e.z, e.ang * 2.2, sp * 0.9); shot(e.x, e.z, e.ang * 2.2 + Math.PI, sp * 0.9); } }
 }
 function bossDown(e) {
-  const x = e.x, z = e.z, y = CONFIG.hover + 1.5, n = G.sectorN + 1, pts = 5000 * n * G.mult;
+  const x = e.x, z = e.z, y = CONFIG.hover + 1.5, n = G.sectorN + 1, pts = ENEMY[e.type].score * n * G.mult;
   burst(x, z, y, hdr(HEX.pink, 2.6), 220, 8, 46, 0.8, 1.8, 0.7, 0.9); burst(x, z, y, hdr('#ffffff', 2.4), 60, 6, 30, 0.3, 0.8, 1.3, 0.6);
   debris(x, z, y, HEX.pink, 70, 26); debris(x, z, y, '#ffffff', 20, 20);
   shock(x, z, 0.1, 22, 0.9, HEX.pink, 3); shock(x, z, 0.1, 34, 1.3, HEX.spark, 2); ripple(x, z, 4); ripple(x, z, 2.5);
@@ -1352,19 +1394,88 @@ function bossDown(e) {
   addScore(pts, x, z, HEX.spark); for (const s of eShots) { burst(s.x, s.z, CONFIG.hover, hdrC('#FF3B5C', 2.4), 2, 1, 4, 0.2, 0.4, 0.4); G.score += 5 * G.mult; } eShots = [];
   for (const o of enemies) if (!o.dead && o !== e) killEnemy(o, false);
   for (let i = 0; i < 12 && sparks.length < MAXS; i++) { const a = i / 12 * TAU, sv = rand(4, 7); sparks.push({ x, z, vx: Math.cos(a) * sv, vz: Math.sin(a) * sv, life: CONFIG.sparkLife + 2, ang: rand(0, TAU), y: 3, vy: 6 }); }
-  G.boss = null; bossUI(false); G.bossKills++; setMusicLevel();
+  G.boss = null; bossUI(false); quietBeams(null); G.bossKills++; setMusicLevel();
+  if (e.type === 'quiet') { G.sectorN++; G.secT = 0; G.swarmDone = false; G.pauseSpawn = 9; reachEnding(); return; }
   banner('SECTOR CLEAR', HEX.spark, '+' + fmt(pts), 2.0);
   G.sectorN++; G.secT = 0; G.swarmDone = false; G.pauseSpawn = 4; G.draftQueue++;
   const run = G.runId, next = curSector(), loop = Math.floor(G.sectorN / SECTORS.length);
   setTimeout(() => { if (G.runId === run && (G.state === 'playing' || G.state === 'draft')) { Sound.sector(); banner('SECTOR ' + (G.sectorN + 1), next.tint, next.name + (loop ? ' · LOOP ' + (loop + 1) : ''), 1.8); } }, 2600);
 }
+// ---------- the Echo: you, mirrored across the core, half a beat late ----------
+function updateEcho(e, dt) {
+  const hpK = e.hp / e.maxHp, ph = hpK > 0.66 ? 1 : hpK > 0.33 ? 2 : 3, sp = 9 + Math.floor(G.sectorN / SECTORS.length);
+  bossPhase(e, ph, ph === 2 ? 'the Echo learns your rhythm' : ph === 3 ? 'change it' : null);
+  if (e.echoDash > 0) { e.echoDash -= dt; if (e.echoDash <= 0) { e.dashT = 0.16; e.ddx = -player.dashDx; e.ddz = -player.dashDz; e.dropT = 0; Sound.dash(-player.vx); } }
+  if (e.dashT > 0) { e.dashT -= dt; e.vx = e.ddx * 44; e.vz = e.ddz * 44; e.dropT -= dt;
+    if (e.dropT <= 0) { e.dropT = 0.025; orb(e.x, e.z, rand(-0.5, 0.5), rand(-0.5, 0.5), 2.6); } // its dash leaves a wall of slow orbs
+  } else { const tx = -player.x * 0.8, tz = -player.z * 0.8; e.vx = lerp(e.vx, (tx - e.x) * 2.2, Math.min(1, dt * 4)); e.vz = lerp(e.vz, (tz - e.z) * 2.2, Math.min(1, dt * 4)); }
+  e.ang = Math.atan2(player.z - e.z, player.x - e.x);
+  e.timer -= dt; e.charge = e.timer < 0.5 ? 1 - Math.max(0, e.timer) / 0.5 : 0;
+  if (e.timer <= 0) { const n = ph === 1 ? 3 : 5;
+    for (let i = 0; i < n; i++) shot(e.x, e.z, e.ang + (i - (n - 1) / 2) * 0.17, sp);
+    if (ph === 3 && e.atk % 3 === 2) for (let i = 0; i < 14; i++) shot(e.x, e.z, i / 14 * TAU + e.atk, sp * 0.7);
+    e.atk++; e.timer = ph === 1 ? 1.3 : ph === 2 ? 1.0 : 0.8; Sound.bossShot(e.x); shock(e.x, e.z, 0.1, 4, 0.25, HEX.pink); }
+}
+// ---------- the Quiet: a sealed core, four pulse nodes, two dead beams ----------
+function quietNode(e, k) { const n = spawnEnemy('node', Math.cos(k * TAU / 4) * 9, Math.sin(k * TAU / 4) * 9, 0.8); if (!n) return;
+  n.hp = 14 + 6 * e.cycle; n.owner = e; e.nodes[k] = n; }
+function onNodeDown(n) {
+  const e = n.owner; if (!e || e.dead) return; const left = e.nodes.filter(m => m && !m.dead).length;
+  Sound.quietLayer(4 - left); popup(n.x, n.z, 'BEAT ' + (4 - left) + '/4', HEX.spark, 18, 0.9);
+  if (!left) { e.mode = 'exposed'; e.expT = 9; e.shield = false; banner('THE BEAT RETURNS', HEX.spark, 'strike the core', 1.6, 'reward'); shock(e.x, e.z, 0.1, 18, 0.7, HEX.spark, 2); ripple(e.x, e.z, 3); }
+}
+const qBeamMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  uniforms: { uA: { value: 0 }, uHot: { value: 0 }, uT: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform float uA, uHot, uT; varying vec2 vUv; void main(){ float x = abs(vUv.y - 0.5) * 2.0; float core = exp(-x * x * mix(30.0, 6.0, uHot));
+    float flick = mix(0.55 + 0.45 * step(0.5, fract(uT * 6.0)), 1.0, uHot); vec3 c = mix(vec3(0.6, 0.9, 1.0), vec3(1.6, 1.8, 2.0), uHot) * core * flick * smoothstep(0.0, 0.08, vUv.x);
+    gl_FragColor = vec4(c * uA, 1.0); }` });
+const qBeams = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0.5, 0, 0), qBeamMat); m.position.y = 0.35; m.scale.set(34, 1, 1.6); m.visible = false; scene.add(m); return m; });
+function quietBeams(e) { if (!e) { qBeams.forEach(m => m.visible = false); return; }
+  const on = e.beamState > 0; qBeams.forEach((m, i) => { m.visible = on; m.rotation.y = -(e.beamA + i * Math.PI); m.position.x = e.x; m.position.z = e.z; });
+  qBeamMat.uniforms.uA.value = e.beamState === 1 ? 0.5 : 1; qBeamMat.uniforms.uHot.value = e.beamState === 2 ? 1 : 0; qBeamMat.uniforms.uT.value = G.t; }
+function updateQuiet(e, dt) {
+  e.vx = 0; e.vz = 0; e.x = lerp(e.x, 0, Math.min(1, dt)); e.z = lerp(e.z, 0, Math.min(1, dt));
+  e.orbit += dt * (0.45 + e.cycle * 0.15);
+  e.nodes.forEach((n, k) => { if (!n || n.dead) return; const a = e.orbit + k * TAU / 4, r = 9 + Math.sin(G.t * 1.3 + k) * 1.2; n.x = Math.cos(a) * r; n.z = Math.sin(a) * r; n.ang += dt * 3; });
+  e.shield = e.mode === 'nodes';
+  if (e.mode === 'nodes' && !player.dead) { const d = Math.hypot(player.x, player.z) || 1; if (d > 5) { player.x -= player.x / d * 1.4 * dt; player.z -= player.z / d * 1.4 * dt; } } // the hole pulls
+  if (e.mode === 'exposed') { e.expT -= dt; if (e.expT <= 0) { e.mode = 'nodes'; e.cycle++; for (let k = 0; k < 4; k++) quietNode(e, k); Sound.quietLayer(0); banner('IT SWALLOWS THE BEAT', '#FFFFFF', 'break the nodes again', 1.4, 'threat'); } }
+  e.phase = e.cycle + 1;
+  // silence rings with a rotating gap
+  e.timer -= dt; e.charge = e.timer < 0.6 ? 1 - Math.max(0, e.timer) / 0.6 : 0;
+  if (e.timer <= 0) { const n = 20, gap = (e.atk * 5) % n; e.ringOff += 0.4;
+    for (let i = 0; i < n; i++) { if (i >= gap && i < gap + 4) continue; shot(e.x, e.z, e.ringOff + i / n * TAU, 6.5 + e.cycle * 0.6); }
+    e.atk++; e.timer = (e.beamState === 2 ? 3.4 : 2.6) - e.cycle * 0.25; Sound.bossShot(e.x); shock(e.x, e.z, 0.1, 6, 0.3, '#FFFFFF'); }
+  // the dead beams: 1.2 s warning, then 3.2 s sweeping
+  e.beamT -= dt;
+  if (!e.beamState && e.beamT <= 0) { e.beamState = 1; e.beamT = 1.2; e.beamA = Math.atan2(player.z - e.z, player.x - e.x) + Math.PI / 2; e.beamDir = -e.beamDir; Sound.dashCharge(e.x); }
+  else if (e.beamState === 1 && e.beamT <= 0) { e.beamState = 2; e.beamT = 3.2; G.trauma = Math.min(1, G.trauma + 0.3); Sound.alarm(); }
+  else if (e.beamState === 2 && e.beamT <= 0) { e.beamState = 0; e.beamT = 7 - e.cycle; }
+  if (e.beamState === 2) { e.beamA += dt * (0.55 + 0.1 * e.cycle) * e.beamDir;
+    if (!player.dead && !invulnerable()) for (let i = 0; i < 2; i++) { const a = e.beamA + i * Math.PI, rx = player.x - e.x, rz = player.z - e.z;
+      if (rx * Math.cos(a) + rz * Math.sin(a) > 2 && Math.abs(-rx * Math.sin(a) + rz * Math.cos(a)) < 0.8 + CONFIG.hitbox) { hitPlayer('the Quiet'); break; } } }
+  quietBeams(e);
+}
+const BOSS_AI = { boss: (e, dt) => updateBoss(e, dt), echo: updateEcho, quiet: updateQuiet };
+
+// ---------- the ending ----------
+function reachEnding() {
+  const run = G.runId; meta.cleared = (meta.cleared || 0) + 1; store.set('pulsar3d_meta', meta);
+  setTimeout(() => { if (G.runId === run && G.state === 'playing') banner('THE BEAT HOLDS', '#FFFFFF', 'Keep it.', 2.6, 'reward'); }, 1800);
+  setTimeout(() => { if (G.runId !== run || G.state !== 'playing') return; G.state = 'ending'; Sound.setMode('title');
+    $('endStats').innerHTML = [['SCORE', fmt(G.score)], ['TIME', fmtTime(G.t)], ['PEAK', '×' + G.peakMult], ['BOSSES', G.bossKills]].map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join('');
+    showScreen('ending'); }, 4800);
+}
+function enterAfterglow() { if (G.state !== 'ending') return; G.state = 'playing'; Sound.setMode('game'); setMusicLevel(); showScreen('play'); player.invuln = 2;
+  banner('AFTERGLOW', HEX.spark, 'the loop begins again · faster', 2.2, 'reward'); }
 function updateEShots(dt) {
   const R2 = (CONFIG.arenaR + 0.5) ** 2, gr = grazeR();
   for (const s of eShots) {
     s.x += s.vx * dt; s.z += s.vz * dt; s.life -= dt; if (s.x * s.x + s.z * s.z > R2) s.life = 0;
     if (s.life <= 0 || player.dead) continue;
     const d = Math.hypot(player.x - s.x, player.z - s.z) - 0.34 - CONFIG.hitbox;
-    if (d < 0 && !invulnerable()) { s.life = 0; hitPlayer('a Warden orb'); if (player.dead) break; }
+    if (d < 0 && !invulnerable()) { s.life = 0; hitPlayer(G.boss ? ORB_OF[G.boss.type] : 'a stray orb'); if (player.dead) break; }
     else if (!s.grazed && d < (player.dashT > 0 ? 1.3 : gr * 0.8)) { s.grazed = true; G.grazes++; addScore(Math.round(grazePts() * (player.dashT > 0 ? 1.5 : 0.5)) * G.mult);
       if (Math.random() < 0.35) Sound.graze(s.x); emit(s.x, CONFIG.hover, s.z, rand(-3, 3), rand(1, 3), rand(-3, 3), 0.25, hdrC(HEX.player, 2.4), 0.5); }
   }
@@ -1377,6 +1488,7 @@ function tryDash() {
   let dx = player.vx, dz = player.vz, l = Math.hypot(dx, dz);
   if (l < 1.5) { dx = Math.cos(player.ang); dz = Math.sin(player.ang); l = 1; }
   Object.assign(player, { dashDx: dx / l, dashDz: dz / l, dashT: CONFIG.dashTime, dashCd: dashCdMax(), dashHits: new Set(), dashGrazes: 0 });
+  if (G.boss && G.boss.type === 'echo') G.boss.echoDash = 60 / 112 / 2; // half a beat late
   Sound.dash(player.vx); haptic(12, 0); shock(player.x, player.z, 0.1, 3.2, 0.25, HEX.player); ripple(player.x, player.z, 0.8);
   burst(player.x, player.z, CONFIG.hover, hdrC(HEX.player, 2.4), 18, 2, 8, 0.2, 0.4, 0.5);
 }
@@ -1416,7 +1528,7 @@ function applyCard(c) {
 // ---------- kills, sparks, power-ups ----------
 function killEnemy(e, scored) {
   if (e.dead) return; e.dead = true;
-  if (e.type === 'boss') { if (scored) bossDown(e); else { G.boss = null; bossUI(false); burst(e.x, e.z, 2, hdr(HEX.pink, 2.4), 80, 6, 30, 0.5, 1.2, 0.6); } return; }
+  if (e.isBoss) { if (scored) bossDown(e); else { G.boss = null; bossUI(false); quietBeams(null); burst(e.x, e.z, 2, hdr(HEX.pink, 2.4), 80, 6, 30, 0.5, 1.2, 0.6); } return; }
   const d = ENEMY[e.type], big = e.type === 'splitter' || e.type === 'dasher', y = CONFIG.hover;
   const c = hdr(d.color, 2.4);
   burst(e.x, e.z, y, c, big ? 60 : 40, 6, 22, 0.35, 0.9, 0.55, 0.5);
@@ -1428,6 +1540,7 @@ function killEnemy(e, scored) {
   if (big) flash(e.x, e.z, d.color, 60, 0.3);
   G.trauma = Math.min(1, G.trauma + (big ? 0.2 : 0.1));
   Sound.explode(false, e.x); if (scored) haptic(big ? 18 : 7, big ? 0.05 : 0.09);
+  if (e.type === 'node') onNodeDown(e);
   if (!scored) return;
   G.hitstop = Math.max(G.hitstop, big ? 0.06 : 0.03);
   G.kills++;
@@ -1450,7 +1563,7 @@ function killEnemy(e, scored) {
     powerups.push({ type, x: Math.cos(aa) * rr, z: Math.sin(aa) * rr, life: CONFIG.powerFieldLife, obj }); G.lastPower = G.t;
   }
 }
-function setMusicLevel() { Sound.setLevel(G.boss ? 3 : G.mult >= 10 ? 3 : G.mult >= 6 ? 2 : G.mult >= 3 ? 1 : 0, !!G.boss); }
+function setMusicLevel() { Sound.setLevel(G.boss ? 3 : G.mult >= 10 ? 3 : G.mult >= 6 ? 2 : G.mult >= 3 ? 1 : 0, G.boss ? G.boss.type : null); }
 let lastBuzz = 0;
 function haptic(pattern, minGap = 0.06) { // light touch-screen rumble; off in calm mode
   if (!input.touchMode || settings.fx !== 'full' || !navigator.vibrate) return;
@@ -1524,13 +1637,14 @@ function primary() {
   if (G.state === 'title') startGame('arcade');
   else if (G.state === 'over' && G.overT > CONFIG.restartLock) startGame();
   else if (G.state === 'paused') togglePause();
+  else if (G.state === 'ending') enterAfterglow();
 }
 function togglePause() {
   if (G.state === 'playing') { G.state = 'paused'; input.stick.active = false; input.aim.active = false; input.mouseDown = false; showScreen('pause'); if (Sound.ctx) Sound.ctx.suspend().catch(() => {}); }
   else if (G.state === 'paused') { G.state = 'playing'; showScreen('play'); Sound.init(); if (Sound.ctx) Sound.ctx.resume().catch(() => {}); }
 }
 function goTitle() {
-  if (G.state !== 'over' && G.state !== 'paused') return;
+  if (G.state !== 'over' && G.state !== 'paused' && G.state !== 'ending') return;
   G.runId++; clearWorld(); bossUI(false); G.boss = null; G.state = 'title'; playerObj.visible = false; playerShadow.visible = false;
   if (Sound.ctx) Sound.ctx.resume().catch(() => {}); Sound.setMode('title'); showScreen('title');
 }
@@ -1575,7 +1689,7 @@ window.addEventListener('keydown', e => {
   else if (k === 'Space' || k === 'Enter') primary();
   else if (k === 'KeyR' && (G.state === 'over' || G.state === 'paused')) restartRun();
   else if (k === 'KeyY' && G.state === 'title') startGame('daily');
-  else if (k === 'KeyT' || (k === 'Escape' && G.state === 'over')) goTitle();
+  else if (k === 'KeyT' || (k === 'Escape' && (G.state === 'over' || G.state === 'ending'))) goTitle();
   else if (k === 'KeyG' && G.state === 'title') toggleSetting('aim');
   else if (k === 'Escape' || k === 'KeyP') togglePause();
   else if (k === 'KeyM') toggleSetting('music');
@@ -1606,6 +1720,7 @@ function refreshButtons() {
 const onBtn = (id, fn) => { const b = $(id); b.addEventListener('pointerdown', e => { e.stopPropagation(); }); b.addEventListener('click', e => { e.stopPropagation(); Sound.init(); fn(); b.blur(); }); };
 onBtn('bMusic', () => toggleSetting('music')); onBtn('bSfx', () => toggleSetting('sfx')); onBtn('bFx', () => toggleSetting('fx')); onBtn('bPause', togglePause);
 onBtn('play', () => startGame('arcade')); onBtn('daily', () => startGame('daily')); onBtn('aimMode', () => toggleSetting('aim'));
+onBtn('afterBtn', enterAfterglow); onBtn('endMenuBtn', goTitle);
 onBtn('retryBtn', restartRun); onBtn('overMenuBtn', goTitle);
 document.querySelectorAll('.tg').forEach(b => { b.addEventListener('pointerdown', e => e.stopPropagation()); b.addEventListener('click', e => { e.stopPropagation(); toggleSetting(b.dataset.k); }); });
 onBtn('resumeBtn', () => { if (G.state === 'paused') togglePause(); }); onBtn('restartBtn', restartRun); onBtn('pauseMenuBtn', goTitle);
@@ -1636,14 +1751,14 @@ function refreshHints() {
 let lastScreen = '';
 document.querySelectorAll('.ov').forEach(ov => [...ov.children].forEach((el, i) => el.style.setProperty('--i', i)));
 function showScreen(s) {
-  if (s !== lastScreen) { const ov = { title: 'title', over: 'over', pause: 'pause', draft: 'draft' }[s];
+  if (s !== lastScreen) { const ov = { title: 'title', over: 'over', pause: 'pause', draft: 'draft', ending: 'ending' }[s];
     if (ov) { const el = $(ov); el.classList.remove('in'); void el.offsetWidth; el.classList.add('in'); }
     if (ov && !(s === 'pause' && lastScreen === 'play') && !(s === 'play' && lastScreen === 'pause')) { const w = $('wipe'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); }
     lastScreen = s; }
   document.body.classList.toggle('ingame', s === 'play' || s === 'pause' || s === 'draft');
   $('title').classList.toggle('hidden', s !== 'title'); $('legend').classList.toggle('hidden', s !== 'title'); $('controls').classList.toggle('hidden', s !== 'title');
   $('hud').classList.toggle('hidden', !(s === 'play' || s === 'pause' || s === 'draft')); $('pause').classList.toggle('hidden', s !== 'pause');
-  $('draft').classList.toggle('hidden', s !== 'draft'); $('dashBtn').classList.toggle('hidden', !(s === 'play' && input.touchMode));
+  $('draft').classList.toggle('hidden', s !== 'draft'); $('ending').classList.toggle('hidden', s !== 'ending'); $('dashBtn').classList.toggle('hidden', !(s === 'play' && input.touchMode));
   $('bPause').classList.toggle('hidden', !(s === 'play' || s === 'pause'));
   const ov = $('over'); if (s === 'over') { ov.classList.remove('hidden'); requestAnimationFrame(() => ov.classList.add('show')); fillGameOver(); } else { ov.classList.add('hidden'); ov.classList.remove('show'); }
   if (s === 'title') { const played = dailyBest.day === todayKey() && dailyBest.attempts > 0, st = streak.n > 1 && (streak.last === todayKey() || streak.last === dayKey(Date.now() - 864e5)) ? ' · streak ' + streak.n : '';
@@ -1799,7 +1914,8 @@ function updateEnemies(dt) {
     if (e.warp > 0) { e.warp -= dt; e.ang += dt * 8; if (e.warp <= 0) { e.obj.beam.visible = false; shock(e.x, e.z, 0.08, d.r * 2.5, 0.2, d.color); } continue; }
     const dx = px - e.x, dz = pz - e.z, dist = Math.hypot(dx, dz) || 1, ux = dx / dist, uz = dz / dist;
     if (player.dead) { e.vx *= 0.95; e.vz *= 0.95; }
-    else if (e.type === 'boss') updateBoss(e, dt);
+    else if (e.isBoss) BOSS_AI[e.type](e, dt);
+    else if (e.type === 'node') { e.vx = 0; e.vz = 0; }
     else if (e.type === 'drifter') {
       e.wander += rand(-2, 2) * dt; const tx = Math.cos(e.wander) * 0.7 + ux * 0.35, tz = Math.sin(e.wander) * 0.7 + uz * 0.35, tl = Math.hypot(tx, tz) || 1;
       e.vx = lerp(e.vx, tx / tl * d.speed * ss, Math.min(1, dt * 2)); e.vz = lerp(e.vz, tz / tl * d.speed * ss, Math.min(1, dt * 2)); e.ang += dt * 1.5;
@@ -1829,7 +1945,7 @@ function updateEnemies(dt) {
     }
   }
   for (let i = 0; i < enemies.length; i++) { const a = enemies[i]; if (a.dead || a.warp > 0) continue;
-    for (let j = i + 1; j < enemies.length; j++) { const b = enemies[j]; if (b.dead || b.warp > 0 || a.type === 'boss' || b.type === 'boss') continue;
+    for (let j = i + 1; j < enemies.length; j++) { const b = enemies[j]; if (b.dead || b.warp > 0 || a.isBoss || b.isBoss || a.type === 'node' || b.type === 'node') continue;
       const dx = b.x - a.x, dz = b.z - a.z, rr = a.r + b.r; if (dx > rr || dx < -rr || dz > rr || dz < -rr) continue;
       const d = Math.hypot(dx, dz) || 0.01; if (d < rr) { const push = (rr - d) * 0.25 / d; a.x -= dx * push; a.z -= dz * push; b.x += dx * push; b.z += dz * push; } } }
 }
@@ -1844,10 +1960,11 @@ function updateBullets(dt) {
       if (e.dead || e.warp > 0 || e.immune > 0 || e.id === b.hitId || (b.hits && b.hits.has(e.id))) continue;
       const dx = e.x - b.x, dz = e.z - b.z, rr = e.r + 0.3;
       if (dx * dx + dz * dz < rr * rr) {
-        const kb = e.type === 'boss' ? 0.004 : 0.04;
+        if (e.shield) { b.life = 0; e.flash = 0.03; burst(b.x, b.z, CONFIG.hover, hdrC('#FFFFFF', 2), 3, 2, 8, 0.1, 0.2, 0.4); if (Math.random() < 0.3) Sound.hit(b.x); break; } // the Quiet's core is sealed while a node lives
+        const kb = e.isBoss ? 0.004 : 0.04;
         e.hp -= b.dmg; e.flash = 0.06; b.hitId = e.id; if (b.hits) b.hits.add(e.id); e.vx += b.vx * kb; e.vz += b.vz * kb;
-        if (e.hp <= 0) killEnemy(e, true); else { Sound.hit(b.x); burst(b.x, b.z, CONFIG.hover, hdrC(ENEMY[e.type].color, 2.4), e.type === 'boss' ? 4 : 8, 3, 10, 0.12, 0.25, 0.4); }
-        if (!b.pierce) { if (b.left > 0 && e.type !== 'boss') b.left--; else { b.life = 0; break; } }
+        if (e.hp <= 0) killEnemy(e, true); else { Sound.hit(b.x); burst(b.x, b.z, CONFIG.hover, hdrC(ENEMY[e.type].color, 2.4), e.isBoss ? 4 : 8, 3, 10, 0.12, 0.25, 0.4); }
+        if (!b.pierce) { if (b.left > 0 && !e.isBoss) b.left--; else { b.life = 0; break; } }
       }
     }
   }
@@ -1929,10 +2046,14 @@ function syncScene(dt) {
       if (e.type === 'drifter') { o.model.rotation.set(0, e.ang, Math.sin(time + e.bob) * 0.25); if (o.ringMesh) o.ringMesh.rotation.z = time * 2; }
       else if (e.type === 'chaser') o.model.rotation.set(e.ang * 0.7, e.ang, 0);
       else if (e.type === 'splitter' || e.type === 'mini') o.model.rotation.set(0, e.ang * 1.6, 0);
-      else if (e.type === 'boss') { o.model.position.y = 2.4 + Math.sin(time * 1.4) * 0.3; o.model.rotation.set(0, e.ang, Math.sin(time * 0.7) * 0.15); if (o.ringMesh) o.ringMesh.rotation.z = time * (2 + e.phase); }
+      else if (e.type === 'boss') { o.model.position.y = 2.4 + Math.sin(time * 1.4) * 0.3; o.model.rotation.set(Math.sin(time * 0.7) * 0.12, e.ang * 0.3, 0); if (o.ringMesh) o.ringMesh.rotation.y = time * (0.8 + e.phase * 0.6); }
+      else if (e.type === 'quiet') { o.model.position.y = 3.2 + Math.sin(time * 0.9) * 0.2; o.model.rotation.set(0.35, time * 0.15, 0); if (o.ringMesh) o.ringMesh.rotation.z = Math.sin(time * 0.6) * 0.2;
+        o.model.scale.setScalar(d.r * 1.05 * (1 + (e.mode === 'exposed' ? 0.06 * Math.sin(time * 14) : 0))); }
+      else if (e.type === 'echo') { o.model.position.y = 1.7; o.model.rotation.set(0, -e.ang - Math.PI / 2, 0); }
+      else if (e.type === 'node') { o.model.rotation.set(0, e.ang, 0); if (o.ringMesh) o.ringMesh.rotation.z = time * 4; }
       else { o.model.rotation.set(0, -e.ang - Math.PI / 2, 0); } }
     const fl = e.flash > 0 || (e.type === 'dasher' && e.state === 'aim' && e.timer < 0.2);
-    if (e.type === 'boss' && e.charge > 0 && !fl) { tmpC.copy(o.baseGlow).multiplyScalar(1 + e.charge * 1.8 * (0.7 + 0.3 * Math.sin(time * 40))); for (const m of o.glows) m.color.copy(tmpC); }
+    if (e.isBoss && e.charge > 0 && !fl) { tmpC.copy(o.baseGlow).multiplyScalar(1 + e.charge * 1.8 * (0.7 + 0.3 * Math.sin(time * 40))); for (const m of o.glows) m.color.copy(tmpC); }
     else for (const m of o.glows) m.color.copy(fl ? tmpC.setRGB(4, 4, 4) : o.baseGlow);
     if (o.aim) { const on = e.state === 'aim' && e.warp <= 0; o.aim.visible = on; if (on) { const k = 1 - e.timer / d.aimTime; o.aim.rotation.y = -e.dir - Math.PI / 2; o.aim.position.y = 0.05; o.aim.material.uniforms.uA.value = 0.3 + k * 0.9; o.aim.material.uniforms.uT.value = time; } }
   }
@@ -2051,7 +2172,7 @@ function boot(models) {
   const l = $('loading'); l.style.opacity = 0; setTimeout(() => l.remove(), 700);
 }
 const onModels = gltf => {
-  const m = {}; gltf.scene.traverse(o => { if (['Player', 'Drifter', 'Chaser', 'Splitter', 'Dasher'].includes(o.name)) m[o.name] = o; });
+  const m = {}; gltf.scene.traverse(o => { if (['Player', 'Drifter', 'Chaser', 'Splitter', 'Dasher', 'Warden', 'Quiet'].includes(o.name)) m[o.name] = o; });
   const fb = fallbackModels(); for (const k of Object.keys(fb)) if (!m[k]) m[k] = fb[k];
   boot(m);
 }, onModelFail = err => { console.warn('GLB failed, using fallback geometry', err); boot(fallbackModels()); };
@@ -2059,7 +2180,7 @@ const onModels = gltf => {
 if (window.PULSAR_GLB) { const bin = Uint8Array.from(atob(window.PULSAR_GLB), c => c.charCodeAt(0)); new GLTFLoader().parse(bin.buffer, '', onModels, onModelFail); }
 else new GLTFLoader().load('assets/pulsar.glb', onModels, undefined, onModelFail);
 requestAnimationFrame(loop);
-window.PULSAR = { Sound, get safeMode() { return safeMode; }, recheckBlack() { blackChecks = 0; framesSinceBoot = 0; }, composer, G, player, get enemies() { return enemies; }, startGame, spawnEnemy, CONFIG, settings, perf, camera, scene, dbg: { playerObj, trail, playerShadow, playerLight, points, bulletMesh, sparkMesh, debrisMesh } };
+window.PULSAR = { Sound, kill: e => killEnemy(e, true), get safeMode() { return safeMode; }, recheckBlack() { blackChecks = 0; framesSinceBoot = 0; }, composer, G, player, get enemies() { return enemies; }, startGame, spawnEnemy, CONFIG, settings, perf, camera, scene, dbg: { playerObj, trail, playerShadow, playerLight, points, bulletMesh, sparkMesh, debrisMesh } };
 </script>
 </body>
 </html>
