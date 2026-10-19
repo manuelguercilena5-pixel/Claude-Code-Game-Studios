@@ -874,15 +874,20 @@ const bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.7, 0.4, 0.8
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 const fxPass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uAberr: { value: 0 }, uFlash: { value: 0 }, uTime: { value: 0 }, uScan: { value: 1 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, uAberr: { value: 0 }, uFlash: { value: 0 }, uTime: { value: 0 }, uScan: { value: 1 }, uRes: { value: new THREE.Vector2(1, 1) },
+    uWave: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, uAccent: { value: new THREE.Vector4() } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uAberr, uFlash, uTime, uScan; uniform vec2 uRes; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uAberr, uFlash, uTime, uScan; uniform vec2 uRes; uniform vec4 uWave[6], uAccent; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
-      vec2 d = vUv - 0.5; float r2 = dot(d, d);
+      vec2 uv = vUv, asp = vec2(uRes.x / uRes.y, 1.0);
+      for (int i = 0; i < 6; i++) { vec4 w = uWave[i]; if (w.w <= 0.0) continue;                // shockwave refraction rings, no extra taps
+        vec2 dd = (uv - w.xy) * asp; float l = length(dd), x = l - w.z; uv -= dd / max(l, 1e-4) / asp * w.w * exp(-x * x * 900.0) * 0.02; }
+      vec2 d = uv - 0.5; float r2 = dot(d, d);
       float ab = 0.0012 + r2 * 0.006 + uAberr * 0.012;
-      vec3 c = vec3(texture2D(tDiffuse, vUv + d * ab).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - d * ab).b);
+      vec3 c = vec3(texture2D(tDiffuse, uv + d * ab).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - d * ab).b);
+      c += uAccent.rgb * uAccent.w * smoothstep(0.1, 0.5, r2);                          // reward accent: edges only, never a full-screen flash
       c *= 1.0 - smoothstep(0.18, 0.62, r2) * 0.62;                                   // vignette
       c += vec3(1.0, 0.23, 0.19) * uFlash * smoothstep(0.05, 0.5, r2) * 0.8;           // damage: edges only (photosensitivity)
       float sl = 0.5 + 0.5 * sin(vUv.y * uRes.y * 1.5708);
@@ -1246,6 +1251,38 @@ function updateFlashes(dt) {
   for (let i = 0; i < MAX_FL; i++) { const s = flState[i]; s.t = Math.max(0, s.t - dt); flU[i].w = s.max ? s.k * (s.t / s.max) ** 2 : 0; }
 }
 
+// ---------- VFX pass 2: refraction waves, accent tint, kill pops, scorch, dash afterimages (technical-artist spec) ----------
+const WAVES = Array.from({ length: 6 }, () => ({ x: 0, z: 0, t: 0, max: 1, s: 0, r: 0.3 })); let waveHead = 0;
+function wave(x, z, s = 1, life = 0.6, r = 0.32) { if (settings.fx !== 'full' || perf.quality < 0.7) return; const w = WAVES[waveHead]; waveHead = (waveHead + 1) % (MOBILE ? 3 : 6);
+  Object.assign(w, { x, z, t: life, max: life, s, r }); }
+const accentC = new THREE.Color(); let accentK = 0;
+function accent(hex, k = 0.35) { accentC.set(hex); accentK = Math.max(accentK, k * (settings.fx === 'full' ? 1 : 0.5)); }
+const POPS3 = Array.from({ length: 12 }, () => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  s.visible = false; s.renderOrder = 3; scene.add(s); return { s, t: 0, max: 0.1, k: 1, size: 1 }; }); let pop3Head = 0;
+function killPop(x, z, hex, size) { const p = POPS3[pop3Head]; pop3Head = (pop3Head + 1) % POPS3.length; p.s.position.set(x, CONFIG.hover + 0.4, z); p.s.material.color.copy(hdr(hex, 3)); Object.assign(p, { t: 0.14, max: 0.14, size }); p.s.visible = true; }
+const SCORCH = 24, scorchMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, premultipliedAlpha: true,
+  uniforms: { map: { value: glowTex } }, vertexShader: `varying vec2 vUv; varying float vK; void main(){ vUv = uv; vK = instanceColor.r; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying float vK; void main(){ float a = texture2D(map, vUv).a * vK; gl_FragColor = vec4(vec3(1.0 - a * 0.55), 1.0); }` }), SCORCH);
+scorchMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(SCORCH * 3), 3); scorchMesh.frustumCulled = false; scorchMesh.renderOrder = -1; scene.add(scorchMesh);
+const scorches = Array.from({ length: SCORCH }, () => ({ x: 0, z: 0, s: 1, t: 0 })); let scorchHead = 0;
+function scorch(x, z, s) { const c = scorches[scorchHead]; scorchHead = (scorchHead + 1) % SCORCH; Object.assign(c, { x, z, s, t: 4 }); }
+let ghosts = [], ghostHead = 0, ghostCd = 0;
+function makeGhosts(tpl) { ghosts = [0, 1, 2].map(() => { const g = tpl.clone(true), m = new THREE.MeshBasicMaterial({ color: hdr(HEX.player, 1.4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  g.traverse(o => { if (o.isMesh) o.material = m; }); g.scale.setScalar(1.45); g.visible = false; scene.add(g); return { g, m, t: 0 }; }); }
+function updateVfx(dt) {
+  const U = fxPass.uniforms.uWave.value;
+  WAVES.forEach((w, i) => { if (w.t <= 0) { U[i].w = 0; return; } w.t -= dt; const k = 1 - w.t / w.max; tmpV.set(w.x, CONFIG.hover, w.z).project(camera);
+    U[i].set(tmpV.x * 0.5 + 0.5, tmpV.y * 0.5 + 0.5, w.r * (1 - Math.pow(1 - k, 2.5)), Math.max(0, w.s * (1 - k))); });
+  accentK = Math.max(0, accentK - dt / 0.4 * 0.35); fxPass.uniforms.uAccent.value.set(accentC.r, accentC.g, accentC.b, accentK);
+  for (const p of POPS3) { if (!p.s.visible) continue; p.t -= dt; if (p.t <= 0) { p.s.visible = false; continue; } const k = 1 - p.t / p.max; p.s.scale.setScalar(p.size * (1 + k * 2)); p.s.material.opacity = 1 - k; }
+  let n = 0; for (const c of scorches) { if (c.t <= 0) continue; c.t -= dt; dummy.position.set(c.x, 0.03, c.z); dummy.rotation.set(0, 0, 0); dummy.scale.set(c.s, 1, c.s); dummy.updateMatrix();
+    scorchMesh.setMatrixAt(n, dummy.matrix); scorchMesh.instanceColor.setXYZ(n, Math.min(1, c.t / 1.5), 0, 0); n++; }
+  scorchMesh.count = n; scorchMesh.instanceMatrix.needsUpdate = true; scorchMesh.instanceColor.needsUpdate = true;
+  if (ghosts.length) { if (player.dashT > 0 && (ghostCd -= dt) <= 0 && settings.fx === 'full') { ghostCd = 0.045; const g = ghosts[ghostHead]; ghostHead = (ghostHead + 1) % 3;
+      g.g.position.copy(playerObj.position); g.g.rotation.copy(playerObj.rotation); g.t = 0.25; g.g.visible = true; }
+    for (const g of ghosts) { if (!g.g.visible) continue; g.t -= dt; if (g.t <= 0) { g.g.visible = false; continue; } g.m.opacity = (g.t / 0.25) * 0.6; } }
+}
+
 // =====================================================================
 // PLAYER OBJECT, TRAIL, SHIELD
 // =====================================================================
@@ -1434,8 +1471,21 @@ function spawnBoss() {
   if (kind === 'quiet') { for (let k = 0; k < 4; k++) quietNode(e, k); }
 }
 function bossPhase(e, ph, note) {
-  if (ph === e.phase) return; e.phase = ph; e.timer = 1.0; banner('PHASE ' + ph, HEX.pink, note, 1.0);
+  if (ph === e.phase) return; e.phase = ph; e.timer = 1.0; banner('PHASE ' + ph, HEX.pink, note, 1.0); wave(e.x, e.z, 1.2, 0.8, 0.4);
   shock(e.x, e.z, 0.1, 14, 0.6, HEX.pink); ripple(e.x, e.z, 2.2); Sound.alarm();
+}
+// boss death in beats: 1.8 s of breaking apart before the finale (technical-artist sequence, simplified)
+function startBossDeath(e) {
+  e.dying = 1.8; e.immune = 99; e.charge = 0; e.beamState = 0; quietBeams(null); player.invuln = Math.max(player.invuln, 3);
+  for (const s of eShots) burst(s.x, s.z, CONFIG.hover, hdrC('#FF3B5C', 2.4), 2, 1, 4, 0.2, 0.4, 0.4); eShots = [];
+  G.hitstop = 0.12; bulletTime(1.0); wave(e.x, e.z, 1.6, 0.9, 0.5); Sound.duckMusic(10, 1.6); Sound.alarm(); haptic([20, 40, 20, 40, 60], 0);
+}
+function updateDying(e, dt) {
+  e.dying -= dt; e.vx *= 0.9; e.vz *= 0.9; e.charge = 0.5 + 0.5 * Math.sin(G.t * TAU * 2.5); // flicker stays under 3 Hz (photosensitivity)
+  e.popT = (e.popT || 0) - dt;
+  if (e.popT <= 0 && e.dying > 0.3) { e.popT = 0.2; const a = rand(0, TAU), r = rand(0.5, e.r * 1.2), x = e.x + Math.cos(a) * r, z = e.z + Math.sin(a) * r, c = ENEMY[e.type].color;
+    burst(x, z, CONFIG.hover + 1.5, hdr(c, 2.4), 40, 5, 20, 0.3, 0.8, 0.6); killPop(x, z, c, 5); shock(x, z, 0.1, 6, 0.35, c); wave(x, z, 0.6, 0.4, 0.15); Sound.explode(false, x); G.trauma = Math.min(1, G.trauma + 0.25); }
+  if (e.dying <= 0) { e.dyingDone = true; e.immune = 0; killEnemy(e, true); }
 }
 function orb(x, z, vx, vz, life) { if (eShots.length < MAXE) eShots.push({ x, z, vx, vz, life, grazed: false }); }
 function shot(x, z, a, sp) { if (eShots.length >= MAXE) return; eShots.push({ x: x + Math.cos(a) * 3.1, z: z + Math.sin(a) * 3.1, vx: Math.cos(a) * sp, vz: Math.sin(a) * sp, life: 7, grazed: false }); }
@@ -1460,7 +1510,7 @@ function bossDown(e) {
   burst(x, z, y, hdr(HEX.pink, 2.6), 220, 8, 46, 0.8, 1.8, 0.7, 0.9); burst(x, z, y, hdr('#ffffff', 2.4), 60, 6, 30, 0.3, 0.8, 1.3, 0.6);
   debris(x, z, y, HEX.pink, 70, 26); debris(x, z, y, '#ffffff', 20, 20);
   shock(x, z, 0.1, 22, 0.9, HEX.pink, 3); shock(x, z, 0.1, 34, 1.3, HEX.spark, 2); ripple(x, z, 4); ripple(x, z, 2.5);
-  floorFlash(x, z, HEX.pink, 4, 16, 1.2); flash(x, z, HEX.pink, 260, 0.8);
+  floorFlash(x, z, HEX.pink, 4, 16, 1.2); flash(x, z, HEX.pink, 260, 0.8); wave(x, z, 2.2, 1.1, 0.7); scorch(x, z, 14); killPop(x, z, '#FFFFFF', 12); accent('#FFFFFF', 0.3);
   G.trauma = 1; G.hitstop = 0.22; Sound.explode(true); Sound.chain(); haptic([40, 30, 90], 0); bulletTime(1.1);
   addScore(pts, x, z, HEX.spark); for (const s of eShots) { burst(s.x, s.z, CONFIG.hover, hdrC('#FF3B5C', 2.4), 2, 1, 4, 0.2, 0.4, 0.4); G.score += 5 * G.mult; } eShots = [];
   for (const o of enemies) if (!o.dead && o !== e) killEnemy(o, false);
@@ -1620,7 +1670,7 @@ function tryDash() {
   Object.assign(player, { dashDx: dx / l, dashDz: dz / l, dashT: CONFIG.dashTime, dashCd: dashCdMax(), dashHits: new Set(), dashGrazes: 0 });
   if (G.boss && G.boss.type === 'echo') G.boss.echoDash = 60 / 112 / 2; // half a beat late
   Sound.dash(player.vx); haptic(12, 0); shock(player.x, player.z, 0.1, 3.2, 0.25, HEX.player); ripple(player.x, player.z, 0.8);
-  burst(player.x, player.z, CONFIG.hover, hdrC(HEX.player, 2.4), 18, 2, 8, 0.2, 0.4, 0.5);
+  burst(player.x, player.z, CONFIG.hover, hdrC(HEX.player, 2.4), 18, 2, 8, 0.2, 0.4, 0.5); wave(player.x, player.z, 0.5, 0.35, 0.12); ghostCd = 0;
 }
 
 // ---------- upgrade draft ----------
@@ -1658,7 +1708,7 @@ function applyCard(c) {
 // ---------- kills, sparks, power-ups ----------
 function killEnemy(e, scored) {
   if (e.dead) return; e.dead = true;
-  if (e.isBoss) { if (scored) bossDown(e); else { G.boss = null; bossUI(false); quietBeams(null); burst(e.x, e.z, 2, hdr(HEX.pink, 2.4), 80, 6, 30, 0.5, 1.2, 0.6); } return; }
+  if (e.isBoss) { if (scored && !e.dyingDone) { e.dead = false; if (!e.dying) startBossDeath(e); return; } if (scored) bossDown(e); else { G.boss = null; bossUI(false); quietBeams(null); burst(e.x, e.z, 2, hdr(HEX.pink, 2.4), 80, 6, 30, 0.5, 1.2, 0.6); } return; }
   const d = ENEMY[e.type], big = e.type === 'splitter' || e.type === 'dasher', y = CONFIG.hover;
   const c = hdr(d.color, 2.4);
   burst(e.x, e.z, y, c, big ? 60 : 40, 6, 22, 0.35, 0.9, 0.55, 0.5);
@@ -1668,6 +1718,7 @@ function killEnemy(e, scored) {
   ripple(e.x, e.z, big ? 0.9 : 0.6);
   floorFlash(e.x, e.z, d.color, big ? 3 : 2, big ? 4.5 : 3.2, 0.35);
   if (big) flash(e.x, e.z, d.color, 60, 0.3);
+  killPop(e.x, e.z, d.color, big ? 4.5 : 3); if (big) { wave(e.x, e.z, 0.7, 0.5, 0.18); scorch(e.x, e.z, 5); } else if (Math.random() < 0.4) scorch(e.x, e.z, 3);
   G.trauma = Math.min(1, G.trauma + (big ? 0.2 : 0.1));
   Sound.explode(false, e.x); if (scored) haptic(big ? 18 : 7, big ? 0.05 : 0.09);
   if (e.type === 'node') onNodeDown(e);
@@ -1678,7 +1729,7 @@ function killEnemy(e, scored) {
   G.chain = (G.t - G.lastKill <= chainWin()) ? G.chain + 1 : 1; G.lastKill = G.t; G.maxChain = Math.max(G.maxChain, G.chain); if (G.chain >= 50) unlock('chain');
   addScore(d.score * G.mult, e.x, e.z, d.color);
   if (G.chain % CONFIG.chainBonusEvery === 0) { const bonus = G.chain * 10 * G.mult; addScore(bonus); banner('CHAIN ×' + G.chain, HEX.pink, '+' + fmt(bonus), 1.8, 'reward'); Sound.chain();
-    haptic([12, 30, 12], 0); if (G.chain >= 30) bulletTime(0.5);
+    haptic([12, 30, 12], 0); if (G.chain >= 30) bulletTime(0.5); accent(HEX.pink, 0.3); wave(player.x, player.z, 0.6, 0.5, 0.25);
     shock(player.x, player.z, 0.1, 6 + Math.min(10, G.chain / 5), 0.45, HEX.pink, 2.6); ripple(player.x, player.z, 0.8 + Math.min(1.5, G.chain / 40));
     if (mod('nova') && !G.novaLock) { G.novaLock = true; shock(player.x, player.z, 0.1, 7, 0.4, HEX.pink, 3); ripple(player.x, player.z, 1.6); floorFlash(player.x, player.z, HEX.pink, 3, 7, 0.4);
       for (const o of enemies) if (!o.dead && o.type !== 'boss' && o.warp <= 0 && Math.hypot(o.x - player.x, o.z - player.z) < 7) killEnemy(o, true);
@@ -1707,7 +1758,7 @@ function collectSpark(s) {
   if (G.mult >= CONFIG.multCap) { G.sparkProg = 0; if (mod('singularity')) addScore(50 * G.mult, s.x, s.z, HEX.spark); return; }
   if (G.sparkProg >= spm()) {
     G.sparkProg = 0; G.multUps++; if (G.multUps % CONFIG.cardEvery === 0) G.draftQueue++;
-    G.mult++; G.peakMult = Math.max(G.peakMult, G.mult); if (G.mult >= 10) unlock('hoard'); G.multPulse = 1; Sound.multUp(G.mult); setMusicLevel();
+    G.mult++; G.peakMult = Math.max(G.peakMult, G.mult); accent(HEX.spark, 0.22); if (G.mult >= 10) unlock('hoard'); G.multPulse = 1; Sound.multUp(G.mult); setMusicLevel();
     if (G.mult % 5 === 0) { banner('×' + G.mult + ' MULTIPLIER', HEX.spark, G.mult === CONFIG.multCap ? 'MAXED OUT' : null); shock(player.x, player.z, 0.1, 11, 0.5, HEX.spark); ripple(player.x, player.z, 1.1); }
   }
 }
@@ -1729,7 +1780,7 @@ function hitPlayer(cause) {
     G.hitstop = 0.08; G.trauma = Math.min(1, G.trauma + 0.35); return; }
   G.lives--; G.secHits++; G.bossHit = true; G.killedBy = cause || 'something'; G.mult = Math.max(1, Math.floor(G.mult * (mod('insure') ? 0.7 : CONFIG.hitMultPenalty))); G.sparks = 0; G.sparkProg = 0; G.chain = 0; setMusicLevel(); renderLives();
   G.hitstop = 0.12; G.trauma = 1; G.fovKick = 1; if (G.flashCool <= 0) { G.flash = 1; G.flashCool = 0.5; } G.aberr = 1;
-  Sound.hurt(); haptic(G.lives > 0 ? 80 : [60, 40, 160], 0);
+  Sound.hurt(); haptic(G.lives > 0 ? 80 : [60, 40, 160], 0); wave(player.x, player.z, 1.4, 0.8, 0.45);
   const y = CONFIG.hover;
   burst(player.x, player.z, y, hdr(HEX.player, 2.4), 90, 8, 30, 0.5, 1.2, 0.55, 0.6); burst(player.x, player.z, y, hdr('#ffffff', 2), 24, 4, 20, 0.3, 0.6, 1.1);
   debris(player.x, player.z, y, HEX.player, 22, 16);
@@ -2051,7 +2102,7 @@ function updateEnemies(dt) {
     if (e.warp > 0) { e.warp -= dt; e.ang += dt * 8; if (e.warp <= 0) { e.obj.beam.visible = false; shock(e.x, e.z, 0.08, d.r * 2.5, 0.2, d.color); } continue; }
     const dx = px - e.x, dz = pz - e.z, dist = Math.hypot(dx, dz) || 1, ux = dx / dist, uz = dz / dist;
     if (player.dead) { e.vx *= 0.95; e.vz *= 0.95; }
-    else if (e.isBoss) BOSS_AI[e.type](e, dt);
+    else if (e.isBoss) { if (e.dying) updateDying(e, dt); else BOSS_AI[e.type](e, dt); }
     else if (e.type === 'node') { e.vx = 0; e.vz = 0; }
     else if (e.type === 'drifter') {
       e.wander += rand(-2, 2) * dt; const tx = Math.cos(e.wander) * 0.7 + ux * 0.35, tz = Math.sin(e.wander) * 0.7 + uz * 0.35, tl = Math.hypot(tx, tz) || 1;
@@ -2158,7 +2209,7 @@ function syncScene(dt) {
   sky.material.uniforms.uTime.value = time; sun.material.uniforms.uTime.value = time; abyss.material.uniforms.uTime.value = time;
   fieldMat.uniforms.uTime.value = time; fieldMat.uniforms.uBeat.value = beat; fieldMat.uniforms.uHit.value = Math.max(0, fieldMat.uniforms.uHit.value - dt * 2);
   updateWeather(dt); embers.rotation.y += dt * 0.01; for (let i = 0; i < EMBERS; i++) { emberPos[i * 3 + 1] += dt * (1 + emberSeed[i] * 2.5); if (emberPos[i * 3 + 1] > 12) emberPos[i * 3 + 1] = -55; } emberGeo.attributes.position.needsUpdate = true;
-  updateFlashes(dt);
+  updateFlashes(dt); updateVfx(dt);
 
   // player
   const pv = playing || (G.state === 'over' && !player.dead);
@@ -2297,7 +2348,7 @@ function watchBlack() {
 refreshButtons(); refreshHints(); resize();
 function boot(models) {
   buildTemplates(models);
-  const pl = TEMPL.player.clone(true); pl.scale.setScalar(1.45); playerBank.add(pl);
+  const pl = TEMPL.player.clone(true); pl.scale.setScalar(1.45); playerBank.add(pl); makeGhosts(TEMPL.player);
   const leg = $('legend');
   [['drifter', 'DRIFTER', 'wanders'], ['chaser', 'CHASER', 'hunts you'], ['splitter', 'SPLITTER', 'splits in 3'], ['dasher', 'DASHER', 'telegraphs · dashes']].forEach(([t, name, desc]) => {
     const obj = makeEnemyObject(t); obj.beam.visible = false; obj.model.scale.setScalar(ENEMY[t].r * 1.0); obj.root.visible = false; showcase.push({ t, obj });
