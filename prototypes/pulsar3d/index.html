@@ -390,17 +390,24 @@ const ENEMY = {
 const BOSS_OF = n => ['boss', 'boss', 'echo', 'boss', 'quiet'][n % 5];
 const QUIPS = { 'a Drifter': 'Static that learned to float. Mostly harmless. Mostly.', 'a Chaser': 'It caught up. They usually do.', 'a Splitter': 'Outnumbered by one enemy. Impressive.',
   'a Splitter shard': 'Hit it once, meet the family.', 'a Dasher': 'You saw it coming. So did it.', 'the Warden': 'The door stays shut. For now.', 'a Warden orb': 'The door stays shut. For now.',
-  'the Echo': 'Beaten by your own bad habits.', 'the Quiet': 'Silence wins this round.', 'a Pulse Node': 'Silence wins this round.' };
+  'the Echo': 'Beaten by your own bad habits.', 'the Quiet': 'Silence wins this round.', 'the White Core': 'Closest to the heart. Loudest.', 'a Pulse Node': 'Silence wins this round.' };
 const KILLER = { drifter: 'a Drifter', chaser: 'a Chaser', splitter: 'a Splitter', mini: 'a Splitter shard', dasher: 'a Dasher', boss: 'the Warden', echo: 'the Echo', quiet: 'the Quiet', node: 'a Pulse Node' };
 const ORB_OF = { boss: 'a Warden orb', echo: 'the Echo', quiet: 'the Quiet' };
 // Five sectors, each closed by the Warden. After sector 5 the loop restarts 15% faster.
 const SECTORS = [
-  { name: 'NEON GATE',     tint: '#7A3CFF', mix: { drifter: 1, chaser: 0.6 },                              rate: [1.0, 1.8], speed: 1.0 },
-  { name: 'MAGENTA DRIFT', tint: '#FF2E88', mix: { drifter: 0.6, chaser: 1, splitter: 0.6 },               rate: [1.6, 2.6], speed: 1.08 },
-  { name: 'AMBER RAIL',    tint: '#FFB000', mix: { drifter: 0.4, chaser: 1, splitter: 0.5, dasher: 0.6 },  rate: [2.2, 3.2], speed: 1.16 },
-  { name: 'TOXIC BLOOM',   tint: '#7CFF4F', mix: { drifter: 0.5, chaser: 1, splitter: 0.7, dasher: 0.7 },  rate: [2.8, 4.0], speed: 1.25 },
-  { name: 'WHITE CORE',    tint: '#E8E0FF', mix: { drifter: 0.4, chaser: 1, splitter: 0.7, dasher: 0.9 },  rate: [3.5, 5.0], speed: 1.35 },
+  // each sector: one rule, one set piece at mid-sector, its own weather (narrative-director + game-designer)
+  { name: 'NEON GATE',     tint: '#7A3CFF', mix: { drifter: 1, chaser: 0.6 },                              rate: [1.0, 1.8], speed: 1.0,
+    line: 'The first ring. It remembers light.', event: 'swarm', weather: { c: '#00F0FF', v: [0, 1.4, 0] } },
+  { name: 'MAGENTA DRIFT', tint: '#FF2E88', mix: { drifter: 0.6, chaser: 1, splitter: 0.6 },               rate: [1.6, 2.6], speed: 1.08,
+    line: 'Here, nothing falls. Everything wanders.', event: 'spiral', rule: 'current', rulet: 'a slow current turns the arena', weather: { c: '#FF2E88', v: [5, 0.2, 0] } },
+  { name: 'AMBER RAIL',    tint: '#FFB000', mix: { drifter: 0.4, chaser: 1, splitter: 0.5, dasher: 0.6 },  rate: [2.2, 3.2], speed: 1.16,
+    line: 'Old machinery, still counting.', event: 'rails', rule: 'rails', rulet: 'dashers run on rails', weather: { c: '#FFB000', v: [0, -5, 0] } },
+  { name: 'TOXIC BLOOM',   tint: '#7CFF4F', mix: { drifter: 0.5, chaser: 1, splitter: 0.7, dasher: 0.7 },  rate: [2.8, 4.0], speed: 1.25,
+    line: 'The Hush grew roots.', event: 'bloom', rule: 'bloom', rulet: 'splitters burst into five', weather: { c: '#7CFF4F', v: [0, 0.5, 0], wob: 1.2 } },
+  { name: 'WHITE CORE',    tint: '#E8E0FF', mix: { drifter: 0.4, chaser: 1, splitter: 0.7, dasher: 0.9 },  rate: [3.5, 5.0], speed: 1.35,
+    line: 'Closest to the heart. Loudest.', event: 'storm', weather: { c: '#E8F0FF', v: [0.6, -2, 0] } },
 ];
+const rule = r => G.state !== 'title' && curSector().rule === r;
 // In-run upgrades: pick 1 of 3 after every 6 multiplier gains and after every boss.
 const CARDS = [
   { id: 'twin',    name: 'TWIN BARREL',  c: '#00F0FF', max: 2, desc: n => `+1 parallel gun (${n + 2} lanes) · fire rate −10%` },
@@ -958,6 +965,20 @@ const emberMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false
   vertexShader: `attribute float aSeed; uniform float uScale; varying float vS; void main(){ vS = aSeed; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = (0.25 + aSeed * 0.5) * uScale / -mv.z; gl_Position = projectionMatrix * mv; }`,
   fragmentShader: `varying float vS; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); vec3 c = mix(vec3(1.6, 0.2, 0.9), vec3(0.4, 0.5, 2.0), vS); gl_FragColor = vec4(c * a * a, 1.0); }` });
 const embers = new THREE.Points(emberGeo, emberMat); embers.frustumCulled = false; scene.add(embers);
+// per-sector weather over the disc (technical-artist: reuse points, 0 extra textures)
+const WX = MOBILE ? 90 : 160, wxPos = new Float32Array(WX * 3), wxSeed = new Float32Array(WX);
+for (let i = 0; i < WX; i++) { const a = rand(0, TAU), r = Math.sqrt(Math.random()) * 30; wxPos[i * 3] = Math.cos(a) * r; wxPos[i * 3 + 1] = rand(0.5, 14); wxPos[i * 3 + 2] = Math.sin(a) * r; wxSeed[i] = Math.random(); }
+const wxGeo = new THREE.BufferGeometry(); wxGeo.setAttribute('position', new THREE.BufferAttribute(wxPos, 3)); wxGeo.setAttribute('aSeed', new THREE.BufferAttribute(wxSeed, 1));
+const wxMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uScale: { value: 400 }, uC: { value: new THREE.Color('#00F0FF') }, uK: { value: 0.6 } },
+  vertexShader: `attribute float aSeed; uniform float uScale; varying float vS; void main(){ vS = aSeed; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = (0.12 + aSeed * 0.22) * uScale / -mv.z; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `uniform vec3 uC; uniform float uK; varying float vS; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); gl_FragColor = vec4(uC * (0.6 + vS) * a * a * uK, 1.0); }` });
+const weather = new THREE.Points(wxGeo, wxMat); weather.frustumCulled = false; scene.add(weather);
+function updateWeather(dt) { const S = (G.state !== 'title' && G.sectorN != null && curSector()) || SECTORS[0], W = S.weather, v = W.v, k = Math.min(1, dt * 1.2);
+  wxMat.uniforms.uC.value.lerp(tmpC.set(W.c), k);
+  for (let i = 0; i < WX; i++) { const j = i * 3, s = 0.5 + wxSeed[i]; wxPos[j] += v[0] * s * dt + (W.wob ? Math.sin(time * 0.8 + i) * W.wob * dt : 0); wxPos[j + 1] += v[1] * s * dt; wxPos[j + 2] += v[2] * s * dt;
+    if (wxPos[j + 1] > 14) wxPos[j + 1] = 0.5; else if (wxPos[j + 1] < 0.5) wxPos[j + 1] = 14;
+    const r2 = wxPos[j] * wxPos[j] + wxPos[j + 2] * wxPos[j + 2]; if (r2 > 900) { wxPos[j] *= -0.98; wxPos[j + 2] *= -0.98; } }
+  wxGeo.attributes.position.needsUpdate = true; }
 
 // ---------- arena floor: GW-style rippling grid in real 3D ----------
 const MAX_RIP = 16, MAX_FL = 8;
@@ -1288,7 +1309,7 @@ function startGame(mode) {
     lives: CONFIG.lives, nextLife: CONFIG.extraLifeEvery, kills: 0, grazes: 0, spawnAcc: 0.5, nextWave: CONFIG.waveInterval, pauseSpawn: 0,
     hitstop: 0, slowmo: 0, trauma: 0, flash: 0, aberr: 0, overT: 0, multPulse: 0, lastPower: -99, newBest: false,
     powerT: { spread: 0, overdrive: 0, shield: 0 }, autoAim: input.touchMode || !input.mouseMoved,
-    bulletT: 0, sectorN: 0, secT: 0, swarmDone: false, boss: null, multUps: 0, sparkProg: 0, draftQueue: 0, mods: {}, build: [], killedBy: '', bossKills: 0, novaLock: false, official: false });
+    bulletT: 0, sectorN: 0, secT: 0, swarmDone: false, boss: null, multUps: 0, sparkProg: 0, draftQueue: 0, mods: {}, build: [], killedBy: '', bossKills: 0, novaLock: false, official: false, storm: null });
   G.official = G.mode === 'daily' && !(dailyBest.day === todayKey() && dailyBest.attempts > 0);
   G.prevBest = G.mode === 'daily' ? (dailyBest.day === todayKey() ? dailyBest.score : 0) : best.score;
   Object.assign(player, { x: 0, z: 0, vx: 0, vz: 0, ang: -Math.PI / 2, fireCd: 0, invuln: 1.0, dead: false, bank: 0, dashT: 0, dashCd: 0, dashGrazes: 0 });
@@ -1297,7 +1318,7 @@ function startGame(mode) {
   Sound.level = 0; Sound.setMode('game'); Sound.click();
   shock(0, 0, 0.1, 12, 0.7, HEX.player); ripple(0, 0, 1.4); floorFlash(0, 0, HEX.player, 2.5, 8, 0.8);
   banner(G.mode === 'daily' ? (G.official ? 'DAILY PULSE' : 'DAILY · PRACTICE') : 'SECTOR 1', G.mode === 'daily' ? HEX.pink : HEX.player,
-    G.mode === 'daily' ? (G.official ? 'one official run today · make it count' : 'your official score is already locked') : SECTORS[0].name, 1.6, 'info');
+    G.mode === 'daily' ? (G.official ? 'one official run today · make it count' : 'your official score is already locked') : SECTORS[0].name + ' — ' + SECTORS[0].line, 2.2, 'info');
   showScreen('play');
 }
 function addScore(n, x, z, hex) {
@@ -1330,23 +1351,43 @@ function pickType() {
   let sum = 0; for (const k in w) sum += w[k]; let r = grand(0, sum); for (const k in w) { r -= w[k]; if (r <= 0) return k; } return 'drifter';
 }
 function updateSpawning(dt) {
+  updateStorm(dt);
   if (G.pauseSpawn > 0) { G.pauseSpawn -= dt; return; }
   if (G.boss) { G.spawnAcc += (0.3 + G.sectorN * 0.08) * dt; while (G.spawnAcc >= 1) { G.spawnAcc -= 1; spawnEnemy(G.sectorN > 1 ? pickType() : 'drifter'); } return; } // light escort
   G.secT += dt;
   const S = curSector(), k = clamp(G.secT / CONFIG.sectorLen, 0, 1);
   G.spawnAcc += lerp(S.rate[0], S.rate[1], k) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc -= 1; spawnEnemy(pickType()); }
-  if (!G.swarmDone && G.secT >= CONFIG.sectorLen * 0.5) {
-    G.swarmDone = true; banner('SWARM INCOMING', HEX.pink, S.name); Sound.alarm();
-    for (let i = 0; i < 12; i++) { const a = i / 12 * TAU, r = CONFIG.arenaR - 2.2; spawnEnemy('drifter', Math.cos(a) * r, Math.sin(a) * r, 0.9); }
-    for (let i = 0; i < 2 + G.sectorN * 2; i++) spawnEnemy('chaser', null, null, 0.9);
-    G.pauseSpawn = CONFIG.wavePause;
-  }
-  if (G.secT >= CONFIG.sectorLen) spawnBoss();
+  if (!G.swarmDone && G.secT >= CONFIG.sectorLen * 0.5) { G.swarmDone = true; setPiece(S.event, S); G.pauseSpawn = CONFIG.wavePause; }
+  if (G.secT >= CONFIG.sectorLen && !G.storm) spawnBoss();
 }
 
 // ---------- the Warden (sector boss) ----------
 function bossUI(on) { $('bossWrap').classList.toggle('hidden', !on); }
+function setPiece(kind, S) {
+  const R = CONFIG.arenaR - 2.2, n = G.sectorN; Sound.alarm();
+  if (kind === 'swarm') { banner('SWARM INCOMING', HEX.pink, S.name);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; spawnEnemy('drifter', Math.cos(a) * R, Math.sin(a) * R, 0.9); }
+    for (let i = 0; i < 2 + n * 2; i++) spawnEnemy('chaser', null, null, 0.9); }
+  else if (kind === 'spiral') { banner('SPIRAL', HEX.pink, 'three arms, closing in'); const a0 = grand(0, TAU);
+    for (let arm = 0; arm < 3; arm++) for (let k = 0; k < 7; k++) { const a = a0 + arm * TAU / 3 + k * 0.38, r = R - k * 2.6; spawnEnemy('drifter', Math.cos(a) * r, Math.sin(a) * r, 0.7 + k * 0.12); } }
+  else if (kind === 'rails') { banner('RAIL RUN', HEX.pink, 'six dashers, one direction'); const th = grand(0, TAU), cx = Math.cos(th), cz = Math.sin(th);
+    for (let k = 0; k < 6; k++) { const off = (k - 2.5) * 5.2, x = cx * 22 - cz * off, z = cz * 22 + cx * off, e = spawnEnemy('dasher', x, z, 0.9);
+      if (e) { e.state = 'aim'; e.timer = 1.1 + k * 0.08; e.dir = th + Math.PI; e.ang = e.dir; e.locked = true; } } }
+  else if (kind === 'bloom') { banner('BLOOM', HEX.pink, 'it grows around you');
+    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU, r = 11, x = clamp(player.x + Math.cos(a) * r, -R, R), z = clamp(player.z + Math.sin(a) * r, -R, R); spawnEnemy('splitter', x, z, 1.0); } }
+  else if (kind === 'storm') { banner('CORE STORM', HEX.pink, 'the beams wake up'); G.storm = { x: 0, z: 0, beamState: 1, beamT: 1.4, beamA: Math.atan2(player.z, player.x) + Math.PI / 2, beamDir: grand(0, 1) < 0.5 ? -1 : 1, left: 2 };
+    for (let i = 0; i < 2 + n; i++) spawnEnemy('chaser', null, null, 0.9); }
+}
+function updateStorm(dt) { // White Core: the pulsar's twin beams sweep the disc, telegraphed for 1.4 s
+  const s = G.storm; if (!s || G.boss) return; s.beamT -= dt;
+  if (s.beamState === 1 && s.beamT <= 0) { s.beamState = 2; s.beamT = 4; G.trauma = Math.min(1, G.trauma + 0.3); }
+  else if (s.beamState === 2 && s.beamT <= 0) { if (--s.left > 0) { s.beamState = 1; s.beamT = 1.4; s.beamDir = -s.beamDir; } else { G.storm = null; quietBeams(null); return; } }
+  if (s.beamState === 2) { s.beamA += dt * 0.7 * s.beamDir;
+    if (!player.dead && !invulnerable()) for (let i = 0; i < 2; i++) { const a = s.beamA + i * Math.PI;
+      if (player.x * Math.cos(a) + player.z * Math.sin(a) > 1.5 && Math.abs(-player.x * Math.sin(a) + player.z * Math.cos(a)) < 0.8 + CONFIG.hitbox) { hitPlayer('the White Core'); break; } } }
+  quietBeams(s);
+}
 function spawnBoss() {
   if (G.boss) return;
   const kind = BOSS_OF(G.sectorN), d = ENEMY[kind], loop = Math.floor(G.sectorN / SECTORS.length);
@@ -1399,7 +1440,7 @@ function bossDown(e) {
   banner('SECTOR CLEAR', HEX.spark, '+' + fmt(pts), 2.0);
   G.sectorN++; G.secT = 0; G.swarmDone = false; G.pauseSpawn = 4; G.draftQueue++;
   const run = G.runId, next = curSector(), loop = Math.floor(G.sectorN / SECTORS.length);
-  setTimeout(() => { if (G.runId === run && (G.state === 'playing' || G.state === 'draft')) { Sound.sector(); banner('SECTOR ' + (G.sectorN + 1), next.tint, next.name + (loop ? ' · LOOP ' + (loop + 1) : ''), 1.8); } }, 2600);
+  setTimeout(() => { if (G.runId === run && (G.state === 'playing' || G.state === 'draft')) { Sound.sector(); banner('SECTOR ' + (G.sectorN + 1), next.tint, next.name + (loop ? ' · LOOP ' + (loop + 1) : '') + ' — ' + next.line + (next.rule ? ' · ' + next.rulet : ''), 2.6, 'info'); } }, 2600);
 }
 // ---------- the Echo: you, mirrored across the core, half a beat late ----------
 function updateEcho(e, dt) {
@@ -1554,7 +1595,7 @@ function killEnemy(e, scored) {
       G.novaLock = false; } }
   const ns = e.type === 'splitter' ? 3 : 1;
   for (let i = 0; i < ns && sparks.length < MAXS; i++) { const a = rand(0, TAU), s = rand(1.5, 4.5); sparks.push({ x: e.x, z: e.z, vx: Math.cos(a) * s, vz: Math.sin(a) * s, life: CONFIG.sparkLife, ang: rand(0, TAU), y: 2.2, vy: 4 }); }
-  if (e.type === 'splitter') for (let i = 0; i < 3; i++) { const a = e.ang + i * TAU / 3;
+  if (e.type === 'splitter') for (let i = 0, nm = rule('bloom') ? 5 : 3; i < nm; i++) { const a = e.ang + i * TAU / nm;
     const m = spawnEnemy('mini', e.x + Math.cos(a) * 0.6, e.z + Math.sin(a) * 0.6, 0); if (m) { m.vx = Math.cos(a) * 13; m.vz = Math.sin(a) * 13; m.immune = 0.12; } }
   if (!powerups.length && G.t - G.lastPower > CONFIG.powerMinGap && dropRng() < (mod('battery') ? 0.08 : CONFIG.powerChance)) {
     const types = Object.keys(POWER), type = types[Math.floor(dropRng() * types.length)];
@@ -1777,7 +1818,7 @@ function fillGameOver() {
   else dl.textContent = '';
   if (G.mode === 'daily' && !G.official) { dl.className = ''; dl.textContent = 'PRACTICE RUN · official today: ' + fmt(dailyBest.score); }
   else if (G.mode === 'daily' && G.official) { dl.className = 'nb'; dl.textContent = 'OFFICIAL DAILY RESULT' + (streak.n > 1 ? ' · STREAK ' + streak.n : ''); }
-  $('killedBy').textContent = 'Destroyed by ' + (G.killedBy || 'something') + ' · sector ' + (G.sectorN + 1) + ' · ' + curSector().name + (G.bossKills ? ' · Wardens down: ' + G.bossKills : '');
+  $('killedBy').textContent = 'Destroyed by ' + (G.killedBy || 'something') + ' · sector ' + (G.sectorN + 1) + ' · ' + curSector().name + (G.bossKills ? ' · bosses down: ' + G.bossKills : '');
   $('quip').textContent = G.peakMult >= 10 && G.mult < G.peakMult ? 'So much light. So briefly.' : QUIPS[G.killedBy] || 'The star sends another.';
   $('stats').innerHTML = [['TIME', fmtTime(G.t)], ['SECTOR', G.sectorN + 1], ['PEAK', '×' + G.peakMult], ['CHAIN', G.maxChain], ['NEAR', G.grazes]].map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join('');
   const counts = {}; G.build.forEach(id => counts[id] = (counts[id] || 0) + 1);
@@ -1927,12 +1968,13 @@ function updateEnemies(dt) {
     } else if (e.type === 'dasher') {
       if (e.state === 'rest') { e.vx = lerp(e.vx, ux * d.speed * ss, dt * 3); e.vz = lerp(e.vz, uz * d.speed * ss, dt * 3); e.ang = Math.atan2(uz, ux);
         e.timer -= dt; if (e.timer <= 0) { e.state = 'aim'; e.timer = d.aimTime; e.dir = e.ang; Sound.dashCharge(e.x); } }
-      else if (e.state === 'aim') { e.vx *= 0.85; e.vz *= 0.85; if (e.timer > 0.25) e.dir = Math.atan2(uz, ux); e.ang = e.dir;
-        e.timer -= dt; if (e.timer <= 0) { e.state = 'dash'; e.dashLeft = d.dashDist; ripple(e.x, e.z, 0.6); } }
+      else if (e.state === 'aim') { e.vx *= 0.85; e.vz *= 0.85; if (e.timer > 0.25 && !e.locked) e.dir = Math.atan2(uz, ux); if (rule('rails') && !e.locked) e.dir = Math.round(e.dir / (Math.PI / 4)) * (Math.PI / 4); e.ang = e.dir;
+        e.timer -= dt; if (e.timer <= 0) { e.state = 'dash'; e.dashLeft = d.dashDist * (rule('rails') ? 1.4 : 1); if (rule('rails') && !e.locked) e.dir = Math.round(e.dir / (Math.PI / 4)) * (Math.PI / 4); e.locked = false; ripple(e.x, e.z, 0.6); } }
       else { const v = d.dashSpeed * ss; e.vx = Math.cos(e.dir) * v; e.vz = Math.sin(e.dir) * v; e.dashLeft -= v * dt;
         emit(e.x, CONFIG.hover, e.z, -e.vx * 0.15 + rand(-2, 2), rand(0, 1), -e.vz * 0.15 + rand(-2, 2), 0.3, hdrC(d.color, 2.2), 0.5);
         if (e.dashLeft <= 0) { e.state = 'rest'; e.timer = d.restTime; } }
     }
+    if (rule('current') && !e.isBoss && e.type !== 'node') { e.x -= e.z * 0.085 * dt; e.z += e.x * 0.085 * dt; } // Magenta Drift: the arena turns
     e.x += e.vx * dt; e.z += e.vz * dt;
     if (confine(e, e.r)) { const nx = e.x / Math.hypot(e.x, e.z), nz = e.z / Math.hypot(e.x, e.z), dot = e.vx * nx + e.vz * nz;
       if (dot > 0) { e.vx -= 2 * dot * nx; e.vz -= 2 * dot * nz; } if (e.state === 'dash') e.dashLeft = 0; e.wander = Math.atan2(e.vz, e.vx); }
@@ -2019,7 +2061,7 @@ function syncScene(dt) {
     sky.visible = skyOn; pulsar.visible = skyOn; mountains.visible = skyOn; } floorMat.uniforms.uPlayer.value.set(player.x, 0, player.z);
   sky.material.uniforms.uTime.value = time; sun.material.uniforms.uTime.value = time; abyss.material.uniforms.uTime.value = time;
   fieldMat.uniforms.uTime.value = time; fieldMat.uniforms.uBeat.value = beat; fieldMat.uniforms.uHit.value = Math.max(0, fieldMat.uniforms.uHit.value - dt * 2);
-  embers.rotation.y += dt * 0.01; for (let i = 0; i < EMBERS; i++) { emberPos[i * 3 + 1] += dt * (1 + emberSeed[i] * 2.5); if (emberPos[i * 3 + 1] > 12) emberPos[i * 3 + 1] = -55; } emberGeo.attributes.position.needsUpdate = true;
+  updateWeather(dt); embers.rotation.y += dt * 0.01; for (let i = 0; i < EMBERS; i++) { emberPos[i * 3 + 1] += dt * (1 + emberSeed[i] * 2.5); if (emberPos[i * 3 + 1] > 12) emberPos[i * 3 + 1] = -55; } emberGeo.attributes.position.needsUpdate = true;
   updateFlashes(dt);
 
   // player
@@ -2119,7 +2161,7 @@ function resize() {
   camera.aspect = aspect; camera.updateProjectionMatrix();
   updatePointScale(); fxPass.uniforms.uRes.value.set(w * perf.pr, h * perf.pr);
 }
-function updatePointScale() { const sc = innerHeight * perf.pr / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); pMat.uniforms.uScale.value = sc; emberMat.uniforms.uScale.value = sc; }
+function updatePointScale() { const sc = innerHeight * perf.pr / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); pMat.uniforms.uScale.value = sc; emberMat.uniforms.uScale.value = sc; wxMat.uniforms.uScale.value = sc; }
 window.addEventListener('resize', resize);
 let last = performance.now(), adaptT = 0;
 function loop(now) {
