@@ -111,17 +111,56 @@ audited the rendering code. The performance-analyst audited mobile cost.
   - Bullet-time on boss kills, OVERCHARGE and 30+ chains.
   - The music goes to full intensity during the boss.
 
-**Not done yet** (bigger rewrites flagged by the review):
-- Instanced enemies (about 800 draws down to about 25).
-- A custom logotype.
-- A pulsar-shaped player ship that no longer shares the Dasher's arrowhead
-  silhouette.
-- A bespoke Warden model.
-- A fixed-timestep simulation.
+## Polish pass 2: "it feels unfinished, the sound is retro"
 
-Next, from the same research: achievements that unlock cosmetic ships and trails
-(options, not power), a Pacifism mode, a ghost of your best run, and a second boss
-(Hydra).
+Five specialists worked from the same complaint: audio-director, game-designer,
+ux-designer, narrative-director and technical-artist.
+
+- **Audio.** The chiptune-style live synthesis is gone.
+  - The score is a darksynth track pre-rendered at load into 8-bar loop stems
+    (OfflineAudioContext, no download). Four layers follow the multiplier:
+    core, drive, pulse and lead.
+  - A 128 BPM boss set switches in on the bar, and the title has its own theme.
+  - Every sound effect is a transient, a body and a tail. Effects are panned by
+    world position, slightly randomized, capped per category, and tuned to the
+    current chord. Tonal effects snap to the 1/16 grid.
+  - The master chain is saturation, then a glue compressor, then a limiter, at
+    about −16 LUFS. Preview: `evidence/pass2-score-preview.mp3`.
+- **Type and UI.**
+  - Fonts: Michroma for display, Chakra Petch for labels, Saira Semi Condensed
+    for body text, and Oxanium for tabular numbers. All are served locally from
+    `fonts/` under the OFL.
+  - A custom SVG PULSAR logotype with open A's and a beam through the A.
+  - Motion: a beam wipe and staggered entry on every screen change.
+  - Banners are typed by meaning: info, reward, threat and damage.
+  - Cards carry a glyph and level pips.
+  - The game-over screen leads with the score, the cause of death and a death
+    quip.
+  - The pause screen holds the settings.
+- **Completeness.**
+  - Bosses: Warden, Warden, **Echo** (mirrors you and copies your dash half a
+    beat late), Warden Prime, then **the Quiet** (silences the music; four pulse
+    nodes seal its core, and each one you break brings a music layer back).
+  - A real ending, THE BEAT HOLDS, with credits, then **Afterglow**, the faster
+    endless loop.
+  - Every sector has one rule, one set piece and its own weather: currents,
+    rails, five-way splitters, and the White Core beam storm.
+  - A first-run tutorial that teaches each move by doing it.
+  - The **Star Chart**: a codex, 12 achievements and lifetime records.
+- **Models and effects.**
+  - New Blender models: a round lens-shaped player ship, a spiked Chaser, a
+    split-chevron Dasher, a bespoke Warden with a spinning ring, and the Quiet.
+  - Effects: screen-space refraction waves, edge-only reward accents, kill pops,
+    floor scorch marks, dash afterimages, and a 1.8 s boss death sequence.
+
+**Still open:**
+- Instanced enemies.
+- A fixed-timestep simulation.
+- Gamepad support and key remapping.
+- Colour-blind palettes.
+- Cosmetic unlocks.
+- Feel, framerate and the audio mix still need checking by ear and eye on a
+  real phone.
 
 ## How it's built
 
@@ -132,7 +171,7 @@ Next, from the same research: achievements that unlock cosmetic ships and trails
 | Arena | A 200×200-segment floor shader. Explosion ripples displace it in real 3D (Geometry Wars-style grid), and it carries analytic lights for flashes and for the player's light pool. |
 | World | Gradient sky with stars, a retro sun with animated bands, wireframe mountains, a scrolling-grid abyss below the disc, rising embers, a rim force-field. |
 | Effects | Physical debris that bounces on the disc and falls into the abyss past the rim. A 4000-point particle system, shockwave rings, dynamic lights, a ship trail ribbon, hit-stop, trauma² shake, FOV kick. |
-| Audio | 100% Web Audio synthesis: synthwave music (Am–F–C–G, 104 BPM) whose layers follow the multiplier, fake sidechain, delay, generated-IR reverb. Every SFX is procedural. |
+| Audio | 100% Web Audio. A darksynth score (A minor, 112 BPM, boss set at 128) is pre-rendered into loop stems at load; layers follow the multiplier. SFX are layered and key-locked to the chord, with saturation, glue compression and a limiter on the master. |
 
 Regenerate the models:
 
@@ -183,3 +222,8 @@ Market-driven decisions:
 | ![](evidence/phase1-draft.jpg) | ![](evidence/phase1-boss2.jpg) |
 | ![](evidence/phase1-over.jpg) | ![](evidence/phase1-mobile-cards.jpg) |
 | ![](evidence/visual1-title.jpg) | ![](evidence/visual1-action.jpg) |
+| ![](evidence/pass2-title.jpg) | ![](evidence/pass2-over.jpg) |
+| ![](evidence/pass2-quiet-death.jpg) | ![](evidence/pass2-ending.jpg) |
+| ![](evidence/pass2-models.jpg) | ![](evidence/pass2-mobile.jpg) |
+
+Score preview (title, game layers stacking, boss): `evidence/pass2-score-preview.mp3`.

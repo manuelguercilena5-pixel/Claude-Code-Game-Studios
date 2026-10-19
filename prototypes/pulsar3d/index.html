@@ -1922,7 +1922,7 @@ $('over').style.pointerEvents = 'auto'; $('pause').style.pointerEvents = 'auto';
 // =====================================================================
 const hudEls = { score: $('score'), sub: $('sub'), mult: $('mult'), bar: $('bar'), chain: $('chain'), chainBar: $('chainBar'), lives: $('lives'), powers: $('powers'), hint: $('hint') };
 for (let i = 0; i < CONFIG.sparksPerMult; i++) hudEls.bar.appendChild(document.createElement('i'));
-const shipSvg = '<svg viewBox="0 0 24 24"><path d="M12 2 L20 21 L12 16 L4 21 Z" fill="rgba(0,240,255,.25)" stroke="#00F0FF" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+const shipSvg = '<svg viewBox="0 0 24 24" fill="rgba(0,240,255,.25)" stroke="#00F0FF" stroke-width="1.6" stroke-linejoin="round"><path d="M12 1.5l1.7 7.5h-3.4z"/><ellipse cx="12" cy="15" rx="8" ry="5.5"/><circle cx="12" cy="14" r="2" fill="#00F0FF"/></svg>';
 function renderLives() { hudEls.lives.innerHTML = shipSvg.repeat(Math.max(0, G.lives)); }
 function refreshHints() {
   $('controls').innerHTML = input.touchMode ? (settings.aim === 'assist' ? 'drag to move · auto-aim on' : 'drag anywhere to move · auto-fire where you steer · DASH button')
