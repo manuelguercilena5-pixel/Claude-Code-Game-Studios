@@ -232,6 +232,25 @@
   @media (max-width: 760px) { #bossWrap { top: calc(150px + var(--st)); } #stats { grid-template-columns: repeat(5, minmax(54px, 1fr)); } #lives { top: calc(70px + var(--st)); right: calc(20px + var(--sr)); } }
   #err { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--fg); font: 600 18px var(--b); padding: 24px; text-align: center; }
 
+  /* ---------- star chart, toast ---------- */
+  #chartBtn { margin-top: 14px; pointer-events: auto; border-color: var(--cyan); }
+  #chart { background: rgba(5,1,15,.94); pointer-events: auto; justify-content: flex-start; padding-top: calc(4vh + var(--st)); overflow-y: auto; }
+  .charth { font: 400 clamp(24px, 6vw, 40px) var(--d); letter-spacing: .16em; color: var(--cyan); text-shadow: 0 0 14px var(--cyan); margin: 0; padding-left: .16em; }
+  #chartTabs { display: flex; gap: 8px; margin-top: 14px; pointer-events: auto; flex-wrap: wrap; justify-content: center; }
+  #chartTabs .tg { min-width: 120px; justify-content: center; } #chartTabs .tg.on { border-color: var(--cyan); color: var(--cyan); box-shadow: inset 0 0 12px rgba(0,240,255,.25); }
+  #chartBody { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; width: min(960px, 100%); margin-top: 16px; text-align: left; }
+  .cx { --c: var(--cyan); padding: 12px 14px; background: rgba(8,3,24,.8); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); display: grid; grid-template-columns: 14px 1fr; column-gap: 10px; row-gap: 3px; align-items: center; }
+  .cx i { width: 10px; height: 10px; transform: rotate(45deg); background: var(--c); box-shadow: 0 0 8px var(--c); grid-row: span 3; align-self: start; margin-top: 4px; }
+  .cx b { font: 700 14px var(--u); letter-spacing: .14em; color: var(--c); } .cx span { font: 500 15px/1.3 var(--b); color: var(--fg); } .cx small { font: 600 12px var(--u); letter-spacing: .12em; color: var(--dim); }
+  .cx.lock { opacity: .5; } .cx.lock i { background: transparent; border: 1.5px solid var(--c); box-shadow: none; }
+  .rec { padding: 12px 14px; background: rgba(8,3,24,.8); border: 1px solid rgba(176,76,255,.35); } .rec small { display: block; font: 600 12px var(--u); letter-spacing: .18em; color: var(--dim); } .rec b { font: 700 24px var(--n); }
+  .cxsum { grid-column: 1 / -1; text-align: center; font: 600 13px var(--u); letter-spacing: .14em; color: var(--dim); }
+  #toast { position: fixed; left: 50%; top: calc(12px + var(--st)); transform: translate(-50%, -140%); padding: 10px 18px; background: rgba(8,3,24,.92); border: 1.5px solid var(--gold);
+    box-shadow: 0 0 18px rgba(255,243,92,.35), inset 0 0 12px rgba(255,243,92,.2); text-align: center; pointer-events: none; z-index: 30; opacity: 0; }
+  #toast.on { animation: toast 2.5s var(--e-out) forwards; }
+  @keyframes toast { 0% { transform: translate(-50%, -140%); opacity: 1; } 12%, 85% { transform: translate(-50%, 0); opacity: 1; } 100% { transform: translate(-50%, -140%); opacity: 0; } }
+  #toast small { display: block; font: 600 11px var(--u); letter-spacing: .24em; color: var(--dim); } #toast b { font: 700 16px var(--u); letter-spacing: .14em; color: var(--gold); text-shadow: 0 0 10px var(--gold); }
+
   /* ---------- ending ---------- */
   #ending { background: radial-gradient(ellipse at center, rgba(232,240,255,.16), rgba(5,1,15,.92) 70%); pointer-events: auto; }
   .endh { font: 400 clamp(30px, 8vw, 72px) var(--d); letter-spacing: .14em; margin: 14px 0 0; color: #fff; text-shadow: 0 0 14px #fff, 0 0 40px var(--cyan); padding-left: .14em; text-wrap: balance; }
@@ -297,6 +316,7 @@
     <button class="mode" id="daily"><b>DAILY PULSE</b><small id="dailySub">same run for everyone · Y</small></button>
   </div>
   <div id="bestLine"></div>
+  <button id="chartBtn" class="sbtn">STAR CHART</button>
   <button id="aimMode" class="sbtn">AIM: MANUAL</button>
 </div>
 <div id="legend" class="hidden"></div>
@@ -314,6 +334,12 @@
   <div class="menu col"><button class="mbtn pri" id="retryBtn">RETRY</button><div class="row"><button class="sbtn" id="shareBtn">COPY RESULT</button><button class="mbtn dim" id="overMenuBtn">MAIN MENU</button></div></div>
   <div class="keys" id="overKeys">R · retry &nbsp; T · menu</div>
 </div>
+<div id="chart" class="layer ov hidden">
+  <h2 class="charth">STAR CHART</h2>
+  <div id="chartTabs"><button class="tg" data-t="codex">CODEX</button><button class="tg" data-t="ach">ACHIEVEMENTS</button><button class="tg" data-t="rec">RECORDS</button></div>
+  <div id="chartBody"></div>
+  <div class="menu"><button class="mbtn dim" id="chartClose">BACK</button></div>
+</div>
 <div id="ending" class="layer ov hidden">
   <div class="go">WHITE CORE · CLEARED</div>
   <h2 class="endh">THE BEAT HOLDS</h2>
@@ -328,6 +354,7 @@
   <div id="toggles"><button class="tg" data-k="music">MUSIC <b></b></button><button class="tg" data-k="sfx">SOUND FX <b></b></button><button class="tg" data-k="fx">EFFECTS <b></b></button><button class="tg" data-k="aim">AIM <b></b></button></div>
   <p id="pauseHint">P · resume &nbsp; R · restart &nbsp; T · menu</p></div>
 <div id="banners"></div>
+<div id="toast"></div>
 <div id="wipe"></div>
 <div id="pops"></div>
 <div id="stick" class="hidden"><i class="base"></i><i class="knob"></i></div>
@@ -448,7 +475,9 @@ const store = {
 const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
 const settings = Object.assign({ music: true, sfx: true, fx: reduceMotion ? 'calm' : 'full', aim: 'manual' }, store.get('pulsar3d_settings', {}));
 if (settings.aim !== 'assist') settings.aim = 'manual'; // manual (twin-stick) is the real game; assist is an accessibility option
-let meta = Object.assign({ cleared: 0 }, store.get('pulsar3d_meta', {}));
+let meta = Object.assign({ cleared: 0, tut: false, ach: {}, seen: {}, life: {} }, store.get('pulsar3d_meta', {}));
+meta.life = Object.assign({ runs: 0, kills: 0, phases: 0, time: 0, bosses: 0, best: 0, mult: 1, chain: 0, sector: 0 }, meta.life);
+const saveMeta = () => store.set('pulsar3d_meta', meta);
 let best = Object.assign({ score: 0, mult: 1, chain: 0, time: 0 }, store.get('pulsar3d_best', {}));
 let dailyBest = Object.assign({ day: '', score: 0, attempts: 0 }, store.get('pulsar3d_daily', {}));
 let streak = Object.assign({ last: '', n: 0 }, store.get('pulsar3d_streak', {}));
@@ -1309,7 +1338,8 @@ function startGame(mode) {
     lives: CONFIG.lives, nextLife: CONFIG.extraLifeEvery, kills: 0, grazes: 0, spawnAcc: 0.5, nextWave: CONFIG.waveInterval, pauseSpawn: 0,
     hitstop: 0, slowmo: 0, trauma: 0, flash: 0, aberr: 0, overT: 0, multPulse: 0, lastPower: -99, newBest: false,
     powerT: { spread: 0, overdrive: 0, shield: 0 }, autoAim: input.touchMode || !input.mouseMoved,
-    bulletT: 0, sectorN: 0, secT: 0, swarmDone: false, boss: null, multUps: 0, sparkProg: 0, draftQueue: 0, mods: {}, build: [], killedBy: '', bossKills: 0, novaLock: false, official: false, storm: null });
+    bulletT: 0, sectorN: 0, secT: 0, swarmDone: false, boss: null, multUps: 0, sparkProg: 0, draftQueue: 0, mods: {}, build: [], killedBy: '', bossKills: 0, novaLock: false, official: false, storm: null, secHits: 0, bossHit: false, edgeT: 0,
+    tut: G.mode !== 'daily' && !meta.tut ? { i: 0, t: 0, dist: 0, kills: 0, sparks: 0, phased: false } : null });
   G.official = G.mode === 'daily' && !(dailyBest.day === todayKey() && dailyBest.attempts > 0);
   G.prevBest = G.mode === 'daily' ? (dailyBest.day === todayKey() ? dailyBest.score : 0) : best.score;
   Object.assign(player, { x: 0, z: 0, vx: 0, vz: 0, ang: -Math.PI / 2, fireCd: 0, invuln: 1.0, dead: false, bank: 0, dashT: 0, dashCd: 0, dashGrazes: 0 });
@@ -1322,7 +1352,7 @@ function startGame(mode) {
   showScreen('play');
 }
 function addScore(n, x, z, hex) {
-  G.score += n;
+  G.score += n; if (G.score >= 200000) unlock('nova');
   if (G.score >= G.nextLife) { G.nextLife += CONFIG.extraLifeEvery; if (G.lives < CONFIG.maxLives) { G.lives++; banner('EXTRA LIFE', HEX.mint); Sound.life(); renderLives(); } }
   if (x != null) popup(x, z, '+' + fmt(n), hex, 15 + Math.min(10, G.mult * 0.5));
 }
@@ -1351,7 +1381,7 @@ function pickType() {
   let sum = 0; for (const k in w) sum += w[k]; let r = grand(0, sum); for (const k in w) { r -= w[k]; if (r <= 0) return k; } return 'drifter';
 }
 function updateSpawning(dt) {
-  updateStorm(dt);
+  updateStorm(dt); if (G.tut) { updateTutorial(dt); return; }
   if (G.pauseSpawn > 0) { G.pauseSpawn -= dt; return; }
   if (G.boss) { G.spawnAcc += (0.3 + G.sectorN * 0.08) * dt; while (G.spawnAcc >= 1) { G.spawnAcc -= 1; spawnEnemy(G.sectorN > 1 ? pickType() : 'drifter'); } return; } // light escort
   G.secT += dt;
@@ -1398,7 +1428,7 @@ function spawnBoss() {
   Object.assign(e, { phase: 1, timer: 2.4, atk: 0, ringOff: 0, spiral: 0, spT: 0, orbit: Math.atan2(bz, bx), charge: 0, echoDash: 0, dashT: 0, nodes: [], mode: 'nodes', cycle: 0, expT: 0, beamT: 6, beamA: 0, beamDir: 1 });
   e.obj.beam.scale.set(4, 30, 4);
   const prime = kind === 'boss' && G.sectorN % 5 === 3;
-  G.boss = e; $('bossName').textContent = d.boss + (prime ? ' · PRIME' : '') + ' · SECTOR ' + (G.sectorN + 1); bossUI(true); setMusicLevel(); haptic([30, 60, 30], 0);
+  G.boss = e; G.bossHit = false; $('bossName').textContent = d.boss + (prime ? ' · PRIME' : '') + ' · SECTOR ' + (G.sectorN + 1); bossUI(true); setMusicLevel(); haptic([30, 60, 30], 0);
   const sub = { boss: 'THE WARDEN APPROACHES', echo: 'IT HAS BEEN WATCHING YOU', quiet: 'make the rhythm yourself' }[kind];
   banner(kind === 'quiet' ? 'THE QUIET' : 'WARNING', kind === 'quiet' ? '#FFFFFF' : HEX.pink, sub, 2.4, 'threat'); Sound.alarm(); Sound.duckMusic(6, 1.2);
   if (kind === 'quiet') { for (let k = 0; k < 4; k++) quietNode(e, k); }
@@ -1435,7 +1465,8 @@ function bossDown(e) {
   addScore(pts, x, z, HEX.spark); for (const s of eShots) { burst(s.x, s.z, CONFIG.hover, hdrC('#FF3B5C', 2.4), 2, 1, 4, 0.2, 0.4, 0.4); G.score += 5 * G.mult; } eShots = [];
   for (const o of enemies) if (!o.dead && o !== e) killEnemy(o, false);
   for (let i = 0; i < 12 && sparks.length < MAXS; i++) { const a = i / 12 * TAU, sv = rand(4, 7); sparks.push({ x, z, vx: Math.cos(a) * sv, vz: Math.sin(a) * sv, life: CONFIG.sparkLife + 2, ang: rand(0, TAU), y: 3, vy: 6 }); }
-  G.boss = null; bossUI(false); quietBeams(null); G.bossKills++; setMusicLevel();
+  G.boss = null; bossUI(false); quietBeams(null); G.bossKills++; meta.life.bosses++; charted(e.type); setMusicLevel();
+  if (e.type === 'boss') unlock('jail'); if (G.sectorN % SECTORS.length === 0) unlock('first'); if (e.type === 'echo' && !G.bossHit) unlock('mirror'); if (!G.secHits) unlock('clean'); G.secHits = 0;
   if (e.type === 'quiet') { G.sectorN++; G.secT = 0; G.swarmDone = false; G.pauseSpawn = 9; reachEnding(); return; }
   banner('SECTOR CLEAR', HEX.spark, '+' + fmt(pts), 2.0);
   G.sectorN++; G.secT = 0; G.swarmDone = false; G.pauseSpawn = 4; G.draftQueue++;
@@ -1500,15 +1531,73 @@ function updateQuiet(e, dt) {
 }
 const BOSS_AI = { boss: (e, dt) => updateBoss(e, dt), echo: updateEcho, quiet: updateQuiet };
 
+// ---------- meta: achievements, star chart, lifetime records (all local, nothing sent anywhere) ----------
+const ACH = [
+  ['first', 'FIRST LIGHT', 'Clear Neon Gate'], ['jail', 'JAILBREAK', 'Defeat the Warden'], ['mirror', 'MIRROR, MIRROR', 'Beat the Echo without being hit'],
+  ['loud', 'LOUD ENOUGH', 'Silence the Quiet'], ['after', 'AFTERGLOW', 'Enter the endless loop'], ['beat', 'OFF THE BEAT', 'Phase through 50 enemies'],
+  ['family', 'FAMILY REUNION', 'Kill a splitter and every shard within 2 s'], ['hoard', 'HOARDER', 'Reach a ×10 multiplier'], ['chain', 'CHAIN REACTION', 'Reach a 50-kill chain'],
+  ['edge', 'EDGE DANCER', 'Spend 30 s at the rim in one run'], ['clean', 'UNTOUCHABLE', 'Clear a sector without being hit'], ['nova', 'SUPERNOVA', 'Reach the PULSAR rank'],
+];
+const CODEX = [
+  ['drifter', 'DRIFTER', 'Static that learned to float. Mostly harmless. Mostly.'], ['chaser', 'CHASER', 'It wants your light. It has no plan for after.'],
+  ['splitter', 'SPLITTER', 'Hit it once, meet the family.'], ['mini', 'SHARD', 'What is left of a splitter, still angry.'],
+  ['dasher', 'DASHER', 'Waits a beat, then commits to every bad decision at once.'], ['node', 'PULSE NODE', 'A stolen beat. Break it and the music comes home.'],
+  ['boss', 'THE WARDEN', 'It keeps the door. It no longer remembers which side it is on.'], ['echo', 'THE ECHO', 'Everything you do, slightly worse, slightly later.'],
+  ['quiet', 'THE QUIET', 'Not an enemy. An absence with ambitions.'],
+];
+let toastQ = [], toastT = 0;
+function toast(k, name) { toastQ.push([k, name]); if (!toastT) nextToast(); }
+function nextToast() { const t = toastQ.shift(), el = $('toast'); if (!t) { toastT = 0; el.classList.remove('on'); return; }
+  el.innerHTML = `<small>${t[0]}</small><b>${t[1]}</b>`; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); toastT = setTimeout(nextToast, 2600); }
+function unlock(id) { if (meta.ach[id]) return; const a = ACH.find(x => x[0] === id); if (!a) return;
+  meta.ach[id] = Date.now(); saveMeta(); toast('ACHIEVEMENT', a[1]); Sound.life(); }
+function charted(type) { const first = !meta.seen[type]; meta.seen[type] = (meta.seen[type] || 0) + 1;
+  if (first) { const c = CODEX.find(x => x[0] === type); if (c) toast('STAR CHART · NEW ENTRY', c[1]); saveMeta(); } }
+function recordRun() { const L = meta.life; L.runs++; L.kills += G.kills; L.time += G.t; L.best = Math.max(L.best, G.score); L.mult = Math.max(L.mult, G.peakMult);
+  L.chain = Math.max(L.chain, G.maxChain); L.sector = Math.max(L.sector, G.sectorN + 1); saveMeta(); }
+let chartTab = 'codex';
+function renderChart() {
+  document.querySelectorAll('#chartTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === chartTab));
+  const body = $('chartBody'), L = meta.life;
+  if (chartTab === 'codex') body.innerHTML = CODEX.map(([t, n, line]) => { const k = meta.seen[t] || 0, c = ENEMY[t].color;
+    return `<div class="cx${k ? '' : ' lock'}" style="--c:${c}"><i></i><b>${k ? n : '???'}</b><span>${k ? line : 'Not yet charted.'}</span><small>${k ? fmt(k) + ' destroyed' : ''}</small></div>`; }).join('');
+  else if (chartTab === 'ach') body.innerHTML = ACH.map(([id, n, d]) => `<div class="cx${meta.ach[id] ? '' : ' lock'}" style="--c:${meta.ach[id] ? '#FFF35C' : '#888'}"><i></i><b>${n}</b><span>${d}</span><small>${meta.ach[id] ? 'unlocked' : 'locked'}</small></div>`).join('')
+    + `<p class="cxsum">${Object.keys(meta.ach).length} / ${ACH.length} unlocked</p>`;
+  else body.innerHTML = [['RUNS', fmt(L.runs)], ['BEST SCORE', fmt(Math.max(L.best, best.score))], ['PEAK MULTIPLIER', '×' + Math.max(L.mult, best.mult || 1)], ['BEST CHAIN', fmt(L.chain)],
+    ['ENEMIES DESTROYED', fmt(L.kills)], ['PHASE DASHES', fmt(L.phases)], ['BOSSES DOWN', fmt(L.bosses)], ['FURTHEST SECTOR', L.sector || '—'], ['TIME IN THE ARENA', fmtTime(L.time)], ['ENDINGS', fmt(meta.cleared || 0)]]
+    .map(([l, v]) => `<div class="rec"><small>${l}</small><b>${v}</b></div>`).join('') + `<p class="cxsum"><button class="sbtn" id="tutReset">${meta.tut ? 'REPLAY TUTORIAL NEXT RUN' : 'TUTORIAL ON NEXT RUN ✓'}</button></p>`;
+  const tr = $('tutReset'); if (tr) tr.onclick = e => { e.stopPropagation(); meta.tut = false; saveMeta(); renderChart(); };
+}
+function openChart() { if (G.state !== 'title') return; G.state = 'chart'; renderChart(); showScreen('chart'); }
+function closeChart() { if (G.state !== 'chart') return; G.state = 'title'; showScreen('title'); }
+
+// ---------- first-run tutorial: every verb taught by doing it, no text walls ----------
+const TUT = [
+  { a: () => input.touchMode ? 'DRAG ANYWHERE TO MOVE' : 'MOVE · WASD OR ARROW KEYS', b: 'the disc is yours', done: T => T.dist > 9 },
+  { a: () => input.touchMode ? 'YOU FIRE ON YOUR OWN, WHERE YOU STEER' : 'YOU FIRE ON YOUR OWN · AIM WITH THE MOUSE', b: 'destroy three drifters',
+    enter: () => { for (let k = 0; k < 3; k++) { const a = k * TAU / 3 + 0.5; spawnEnemy('drifter', Math.cos(a) * 14, Math.sin(a) * 14, 0.8); } }, done: T => T.kills >= 3 },
+  { a: () => 'COLLECT THE GOLD SPARKS ◆', b: 'they raise your multiplier · they fade if you wait',
+    enter: () => { for (let k = 0; k < 4; k++) { const a = k * TAU / 4; spawnEnemy('drifter', Math.cos(a) * 16, Math.sin(a) * 16, 0.8); } }, done: T => T.sparks >= 5 },
+  { a: () => input.touchMode ? 'TAP DASH · GO THROUGH AN ENEMY' : 'SHIFT OR SPACE · DASH THROUGH AN ENEMY', b: 'while you dash, nothing can touch you',
+    enter: () => { const d = Math.hypot(player.x, player.z), ux = d > 3 ? -player.x / d : 1, uz = d > 3 ? -player.z / d : 0;
+      for (let k = -2; k <= 2; k++) spawnEnemy('drifter', player.x + ux * 7 - uz * k * 1.8, player.z + uz * 7 + ux * k * 1.8, 0.6); }, done: T => T.phased },
+  { a: () => 'GOOD. NOW KEEP THE BEAT.', b: 'every sector ends at a door, and something guards it', done: T => T.t > 2.8 },
+];
+function updateTutorial(dt) { const T = G.tut; if (!T) return; T.t += dt; T.dist += Math.hypot(player.vx, player.vz) * dt;
+  const s = TUT[T.i]; if (!(s.done(T) || (T.t > 24 && T.i < TUT.length - 1))) return;
+  T.i++; T.t = 0; if (T.i >= TUT.length) { G.tut = null; meta.tut = true; saveMeta(); G.secT = 0; return; }
+  Sound.pickup(); ripple(player.x, player.z, 0.8); if (TUT[T.i].enter) TUT[T.i].enter(); }
+
 // ---------- the ending ----------
 function reachEnding() {
-  const run = G.runId; meta.cleared = (meta.cleared || 0) + 1; store.set('pulsar3d_meta', meta);
+  const run = G.runId; meta.cleared = (meta.cleared || 0) + 1; saveMeta();
+  recordRun(); unlock('loud');
   setTimeout(() => { if (G.runId === run && G.state === 'playing') banner('THE BEAT HOLDS', '#FFFFFF', 'Keep it.', 2.6, 'reward'); }, 1800);
   setTimeout(() => { if (G.runId !== run || G.state !== 'playing') return; G.state = 'ending'; Sound.setMode('title');
     $('endStats').innerHTML = [['SCORE', fmt(G.score)], ['TIME', fmtTime(G.t)], ['PEAK', '×' + G.peakMult], ['BOSSES', G.bossKills]].map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join('');
     showScreen('ending'); }, 4800);
 }
-function enterAfterglow() { if (G.state !== 'ending') return; G.state = 'playing'; Sound.setMode('game'); setMusicLevel(); showScreen('play'); player.invuln = 2;
+function enterAfterglow() { if (G.state !== 'ending') return; G.state = 'playing'; unlock('after'); Sound.setMode('game'); setMusicLevel(); showScreen('play'); player.invuln = 2;
   banner('AFTERGLOW', HEX.spark, 'the loop begins again · faster', 2.2, 'reward'); }
 function updateEShots(dt) {
   const R2 = (CONFIG.arenaR + 0.5) ** 2, gr = grazeR();
@@ -1584,8 +1673,9 @@ function killEnemy(e, scored) {
   if (e.type === 'node') onNodeDown(e);
   if (!scored) return;
   G.hitstop = Math.max(G.hitstop, big ? 0.06 : 0.03);
-  G.kills++;
-  G.chain = (G.t - G.lastKill <= chainWin()) ? G.chain + 1 : 1; G.lastKill = G.t; G.maxChain = Math.max(G.maxChain, G.chain);
+  G.kills++; charted(e.type); if (G.tut) G.tut.kills++;
+  if (e.fam && --e.fam.left <= 0 && G.t - e.fam.t <= 2) unlock('family');
+  G.chain = (G.t - G.lastKill <= chainWin()) ? G.chain + 1 : 1; G.lastKill = G.t; G.maxChain = Math.max(G.maxChain, G.chain); if (G.chain >= 50) unlock('chain');
   addScore(d.score * G.mult, e.x, e.z, d.color);
   if (G.chain % CONFIG.chainBonusEvery === 0) { const bonus = G.chain * 10 * G.mult; addScore(bonus); banner('CHAIN ×' + G.chain, HEX.pink, '+' + fmt(bonus), 1.8, 'reward'); Sound.chain();
     haptic([12, 30, 12], 0); if (G.chain >= 30) bulletTime(0.5);
@@ -1595,8 +1685,8 @@ function killEnemy(e, scored) {
       G.novaLock = false; } }
   const ns = e.type === 'splitter' ? 3 : 1;
   for (let i = 0; i < ns && sparks.length < MAXS; i++) { const a = rand(0, TAU), s = rand(1.5, 4.5); sparks.push({ x: e.x, z: e.z, vx: Math.cos(a) * s, vz: Math.sin(a) * s, life: CONFIG.sparkLife, ang: rand(0, TAU), y: 2.2, vy: 4 }); }
-  if (e.type === 'splitter') for (let i = 0, nm = rule('bloom') ? 5 : 3; i < nm; i++) { const a = e.ang + i * TAU / nm;
-    const m = spawnEnemy('mini', e.x + Math.cos(a) * 0.6, e.z + Math.sin(a) * 0.6, 0); if (m) { m.vx = Math.cos(a) * 13; m.vz = Math.sin(a) * 13; m.immune = 0.12; } }
+  if (e.type === 'splitter') for (let i = 0, nm = rule('bloom') ? 5 : 3, fam = { t: G.t, left: nm }; i < nm; i++) { const a = e.ang + i * TAU / nm;
+    const m = spawnEnemy('mini', e.x + Math.cos(a) * 0.6, e.z + Math.sin(a) * 0.6, 0); if (m) { m.fam = fam; m.vx = Math.cos(a) * 13; m.vz = Math.sin(a) * 13; m.immune = 0.12; } }
   if (!powerups.length && G.t - G.lastPower > CONFIG.powerMinGap && dropRng() < (mod('battery') ? 0.08 : CONFIG.powerChance)) {
     const types = Object.keys(POWER), type = types[Math.floor(dropRng() * types.length)];
     const rr = Math.min(Math.hypot(e.x, e.z), CONFIG.arenaR - 3), aa = Math.atan2(e.z, e.x);
@@ -1613,11 +1703,11 @@ function haptic(pattern, minGap = 0.06) { // light touch-screen rumble; off in c
 }
 function bulletTime(sec) { G.bulletT = Math.max(G.bulletT || 0, sec); } // brief slow motion for big moments
 function collectSpark(s) {
-  G.sparks++; G.sparkProg++; Sound.spark(G.sparkProg); burst(s.x, s.z, s.y, hdrC(HEX.spark, 2.4), 8, 2, 6, 0.15, 0.3, 0.4);
+  G.sparks++; G.sparkProg++; if (G.tut) G.tut.sparks++; Sound.spark(G.sparkProg); burst(s.x, s.z, s.y, hdrC(HEX.spark, 2.4), 8, 2, 6, 0.15, 0.3, 0.4);
   if (G.mult >= CONFIG.multCap) { G.sparkProg = 0; if (mod('singularity')) addScore(50 * G.mult, s.x, s.z, HEX.spark); return; }
   if (G.sparkProg >= spm()) {
     G.sparkProg = 0; G.multUps++; if (G.multUps % CONFIG.cardEvery === 0) G.draftQueue++;
-    G.mult++; G.peakMult = Math.max(G.peakMult, G.mult); G.multPulse = 1; Sound.multUp(G.mult); setMusicLevel();
+    G.mult++; G.peakMult = Math.max(G.peakMult, G.mult); if (G.mult >= 10) unlock('hoard'); G.multPulse = 1; Sound.multUp(G.mult); setMusicLevel();
     if (G.mult % 5 === 0) { banner('×' + G.mult + ' MULTIPLIER', HEX.spark, G.mult === CONFIG.multCap ? 'MAXED OUT' : null); shock(player.x, player.z, 0.1, 11, 0.5, HEX.spark); ripple(player.x, player.z, 1.1); }
   }
 }
@@ -1637,7 +1727,7 @@ function hitPlayer(cause) {
   if (G.powerT.shield > 0) { G.powerT.shield = 0; player.invuln = 0.8; Sound.shieldBreak();
     shock(player.x, player.z, 0.1, CONFIG.clearRadius, 0.4, HEX.player); clearAround(CONFIG.clearRadius * 0.8); ripple(player.x, player.z, 1.6);
     G.hitstop = 0.08; G.trauma = Math.min(1, G.trauma + 0.35); return; }
-  G.lives--; G.killedBy = cause || 'something'; G.mult = Math.max(1, Math.floor(G.mult * (mod('insure') ? 0.7 : CONFIG.hitMultPenalty))); G.sparks = 0; G.sparkProg = 0; G.chain = 0; setMusicLevel(); renderLives();
+  G.lives--; G.secHits++; G.bossHit = true; G.killedBy = cause || 'something'; G.mult = Math.max(1, Math.floor(G.mult * (mod('insure') ? 0.7 : CONFIG.hitMultPenalty))); G.sparks = 0; G.sparkProg = 0; G.chain = 0; setMusicLevel(); renderLives();
   G.hitstop = 0.12; G.trauma = 1; G.fovKick = 1; if (G.flashCool <= 0) { G.flash = 1; G.flashCool = 0.5; } G.aberr = 1;
   Sound.hurt(); haptic(G.lives > 0 ? 80 : [60, 40, 160], 0);
   const y = CONFIG.hover;
@@ -1664,7 +1754,7 @@ function endGame() {
     dailyBest.attempts++; store.set('pulsar3d_daily', dailyBest); }
   else if (G.score > best.score) { G.newBest = G.score > 0; best = { score: G.score, mult: G.peakMult, chain: G.maxChain, time: G.t }; store.set('pulsar3d_best', best); }
   else if (G.peakMult > (best.mult || 1)) { best.mult = G.peakMult; store.set('pulsar3d_best', best); }
-  showScreen('over');
+  recordRun(); showScreen('over');
 }
 
 // =====================================================================
@@ -1730,6 +1820,8 @@ window.addEventListener('keydown', e => {
   else if (k === 'Space' || k === 'Enter') primary();
   else if (k === 'KeyR' && (G.state === 'over' || G.state === 'paused')) restartRun();
   else if (k === 'KeyY' && G.state === 'title') startGame('daily');
+  else if (G.state === 'chart' && (k === 'Escape' || k === 'KeyT')) closeChart();
+  else if (k === 'KeyC' && G.state === 'title') openChart();
   else if (k === 'KeyT' || (k === 'Escape' && (G.state === 'over' || G.state === 'ending'))) goTitle();
   else if (k === 'KeyG' && G.state === 'title') toggleSetting('aim');
   else if (k === 'Escape' || k === 'KeyP') togglePause();
@@ -1751,7 +1843,7 @@ function toggleSetting(id) {
   store.set('pulsar3d_settings', settings); Sound.applySettings(); Sound.click(); refreshButtons(); refreshHints();
 }
 function refreshButtons() {
-  document.querySelectorAll('.tg').forEach(b => { const k = b.dataset.k, on = k === 'fx' ? settings.fx === 'full' : k === 'aim' ? true : settings[k];
+  document.querySelectorAll('#toggles .tg').forEach(b => { const k = b.dataset.k, on = k === 'fx' ? settings.fx === 'full' : k === 'aim' ? true : settings[k];
     b.querySelector('b').textContent = k === 'fx' ? (settings.fx === 'full' ? 'FULL' : 'CALM') : k === 'aim' ? settings.aim.toUpperCase() : on ? 'ON' : 'OFF'; b.classList.toggle('off', !on); b.setAttribute('aria-pressed', on); });
   document.body.classList.toggle('calm', settings.fx !== 'full');
   $('bMusic').classList.toggle('off', !settings.music); $('bSfx').classList.toggle('off', !settings.sfx); $('bFx').classList.toggle('off', settings.fx !== 'full');
@@ -1761,9 +1853,11 @@ function refreshButtons() {
 const onBtn = (id, fn) => { const b = $(id); b.addEventListener('pointerdown', e => { e.stopPropagation(); }); b.addEventListener('click', e => { e.stopPropagation(); Sound.init(); fn(); b.blur(); }); };
 onBtn('bMusic', () => toggleSetting('music')); onBtn('bSfx', () => toggleSetting('sfx')); onBtn('bFx', () => toggleSetting('fx')); onBtn('bPause', togglePause);
 onBtn('play', () => startGame('arcade')); onBtn('daily', () => startGame('daily')); onBtn('aimMode', () => toggleSetting('aim'));
+onBtn('chartBtn', openChart); onBtn('chartClose', closeChart);
+document.querySelectorAll('#chartTabs button').forEach(b => { b.addEventListener('pointerdown', e => e.stopPropagation()); b.addEventListener('click', e => { e.stopPropagation(); chartTab = b.dataset.t; Sound.click(); renderChart(); }); });
 onBtn('afterBtn', enterAfterglow); onBtn('endMenuBtn', goTitle);
 onBtn('retryBtn', restartRun); onBtn('overMenuBtn', goTitle);
-document.querySelectorAll('.tg').forEach(b => { b.addEventListener('pointerdown', e => e.stopPropagation()); b.addEventListener('click', e => { e.stopPropagation(); toggleSetting(b.dataset.k); }); });
+document.querySelectorAll('#toggles .tg').forEach(b => { b.addEventListener('pointerdown', e => e.stopPropagation()); b.addEventListener('click', e => { e.stopPropagation(); toggleSetting(b.dataset.k); }); });
 onBtn('resumeBtn', () => { if (G.state === 'paused') togglePause(); }); onBtn('restartBtn', restartRun); onBtn('pauseMenuBtn', goTitle);
 { const db = $('dashBtn'); db.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); Sound.init(); tryDash(); }); }
 $('shareBtn').addEventListener('pointerdown', e => e.stopPropagation());
@@ -1792,14 +1886,14 @@ function refreshHints() {
 let lastScreen = '';
 document.querySelectorAll('.ov').forEach(ov => [...ov.children].forEach((el, i) => el.style.setProperty('--i', i)));
 function showScreen(s) {
-  if (s !== lastScreen) { const ov = { title: 'title', over: 'over', pause: 'pause', draft: 'draft', ending: 'ending' }[s];
+  if (s !== lastScreen) { const ov = { title: 'title', over: 'over', pause: 'pause', draft: 'draft', ending: 'ending', chart: 'chart' }[s];
     if (ov) { const el = $(ov); el.classList.remove('in'); void el.offsetWidth; el.classList.add('in'); }
     if (ov && !(s === 'pause' && lastScreen === 'play') && !(s === 'play' && lastScreen === 'pause')) { const w = $('wipe'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); }
     lastScreen = s; }
   document.body.classList.toggle('ingame', s === 'play' || s === 'pause' || s === 'draft');
   $('title').classList.toggle('hidden', s !== 'title'); $('legend').classList.toggle('hidden', s !== 'title'); $('controls').classList.toggle('hidden', s !== 'title');
   $('hud').classList.toggle('hidden', !(s === 'play' || s === 'pause' || s === 'draft')); $('pause').classList.toggle('hidden', s !== 'pause');
-  $('draft').classList.toggle('hidden', s !== 'draft'); $('ending').classList.toggle('hidden', s !== 'ending'); $('dashBtn').classList.toggle('hidden', !(s === 'play' && input.touchMode));
+  $('draft').classList.toggle('hidden', s !== 'draft'); $('ending').classList.toggle('hidden', s !== 'ending'); $('chart').classList.toggle('hidden', s !== 'chart'); $('dashBtn').classList.toggle('hidden', !(s === 'play' && input.touchMode));
   $('bPause').classList.toggle('hidden', !(s === 'play' || s === 'pause'));
   const ov = $('over'); if (s === 'over') { ov.classList.remove('hidden'); requestAnimationFrame(() => ov.classList.add('show')); fillGameOver(); } else { ov.classList.add('hidden'); ov.classList.remove('show'); }
   if (s === 'title') { const played = dailyBest.day === todayKey() && dailyBest.attempts > 0, st = streak.n > 1 && (streak.last === todayKey() || streak.last === dayKey(Date.now() - 864e5)) ? ' · streak ' + streak.n : '';
@@ -1851,7 +1945,8 @@ function updateHUD() {
   if (G.boss) $('bossHp').firstChild.style.width = (100 * Math.max(0, G.boss.hp) / G.boss.maxHp) + '%';
   const dk = player.dashCd > 0 ? 1 - player.dashCd / dashCdMax() : 1, dEl = $('dash'), ready = dk >= 1;
   dEl.firstElementChild.firstChild.style.width = (dk * 100) + '%'; if (lastHud.dr !== ready) { dEl.classList.toggle('ready', ready); $('dashBtn').classList.toggle('cool', !ready); lastHud.dr = ready; }
-  hudEls.hint.style.opacity = G.t < 6 ? 1 : 0;
+  if (G.tut) { const s = TUT[G.tut.i], a = s.a(); if (lastHud.tut !== a) { hudEls.hint.querySelector('.a').textContent = a; hudEls.hint.querySelector('.b').textContent = s.b; lastHud.tut = a; } hudEls.hint.style.opacity = 1; }
+  else { if (lastHud.tut) { lastHud.tut = null; refreshHints(); hudEls.hint.querySelector('.b').textContent = 'collect gold sparks ◆ to raise your multiplier · dash THROUGH enemies for PHASE points'; } hudEls.hint.style.opacity = G.t < 4 && meta.tut ? 1 : 0; }
 }
 function banner(text, color, sub, life = 1.8, type) {
   type = type || (color === HEX.danger ? 'damage' : color === HEX.pink ? 'threat' : [HEX.spark, HEX.mint, '#FFD23F'].includes(color) ? 'reward' : 'info');
@@ -1898,13 +1993,14 @@ function updatePlayer(dt) {
     emit(player.x, CONFIG.hover, player.z, rand(-1, 1), rand(-0.5, 0.5), rand(-1, 1), 0.35, hdrC(HEX.player, 2), 0.9);
     for (const e of enemies) { if (e.dead || e.warp > 0 || player.dashHits.has(e.id)) continue;
       if (Math.hypot(e.x - player.x, e.z - player.z) < e.r + 1.1) { player.dashHits.add(e.id); player.dashGrazes++; G.grazes++;
-        const pts = 3 * grazePts() * G.mult; addScore(pts); popup(e.x, e.z, 'PHASE +' + fmt(pts), HEX.player, 14, 0.6); Sound.phase(e.x); haptic(9, 0.04);
+        const pts = 3 * grazePts() * G.mult; addScore(pts); popup(e.x, e.z, 'PHASE +' + fmt(pts), HEX.player, 14, 0.6); if (G.tut) G.tut.phased = true; if (++meta.life.phases >= 50) unlock('beat'); Sound.phase(e.x); haptic(9, 0.04);
         burst(e.x, e.z, CONFIG.hover, hdrC(HEX.player, 2.6), 10, 3, 10, 0.2, 0.4, 0.5); } }
     if (player.dashT <= 0) { player.vx *= 0.35; player.vz *= 0.35;
       if (player.dashGrazes >= 4) { player.dashCd *= 0.5; banner('OVERCHARGE', HEX.player, player.dashGrazes + ' phase grazes · dash refunded', 0.9); bulletTime(0.35); haptic([15, 25, 15], 0); } }
   } else { player.vx = lerp(player.vx, mx * CONFIG.playerSpeed, a); player.vz = lerp(player.vz, mz * CONFIG.playerSpeed, a); }
   if (player.dashCd > 0) player.dashCd -= dt;
   player.x += player.vx * dt; player.z += player.vz * dt; confine(player, CONFIG.playerRadius);
+  if (Math.hypot(player.x, player.z) > CONFIG.arenaR - 4 && (G.edgeT += dt) >= 30) unlock('edge');
   // aim
   let aimAng = null, firing = false;
   if (assist) { // accessibility: aims at the nearest enemy and fires on its own
@@ -2029,7 +2125,7 @@ function updatePickups(dt) {
 
 function step(dt) {
   if (G.state === 'paused' || G.state === 'loading' || G.state === 'draft') return;
-  if (G.state === 'title' || G.state === 'over') {
+  if (G.state === 'title' || G.state === 'over' || G.state === 'chart' || G.state === 'ending') { // menus: the world idles, nothing simulates
     if (G.state === 'over') { G.overT += dt; enemies = enemies.filter(e => { if (e.dead) { releaseEnemyObject(e.type, e.obj); return false; } return true; }); }
     if (G.state === 'title' && Math.random() < dt * 0.7) { const a = rand(0, TAU), r = rand(0, CONFIG.arenaR * 0.8); ripple(Math.cos(a) * r, Math.sin(a) * r, rand(0.5, 1.1)); }
     updateParticles(dt); updateDebris(dt); updateRings(dt); return;
